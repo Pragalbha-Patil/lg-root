@@ -272,14 +272,9 @@ function svcCall(uri, method, params, onOk, onErr){
   } catch (e) { done(onErr, { errorText: String((e && e.message) || e) }); }
 }
 function launch(id, params){
-  var p = { id: id };
-  if (params) {
-    for (var k in params) {
-      if (!Object.prototype.hasOwnProperty.call(params, k)) continue;
-      if (k === "id") continue; // lp params carry id:"uniqueId" marker; never clobber p.id
-      p[k] = params[k];
-    }
-  }
+  // webOS apps expect nested params ({ id, params: {...} }); flattening them
+  // into the top level means they never reach applicationManager/launch.
+  var p = { id: id, params: params || null };
   svcCall(SVC, SVC_LAUNCH_M, p, function(){}, function(e){
     var el = document.getElementById("err");
     el.style.display = "block";
@@ -899,7 +894,9 @@ def build(version=None):
     inject = {
         "__MH_VERSION__": "v" + version,
         "__MH_SYS_IDS__": json.dumps(sys_ids),
-        "__MH_SETTINGS_TILE__": json.dumps(settings_tile),
+        # Settings is optional: it only appears as a tile while it stays in
+        # ui.system, so removing it there really removes it from the page.
+        "__MH_SETTINGS_TILE__": json.dumps(settings_tile if SETTINGS_ID in sys_ids else None),
         "__MH_TITLE__": htmllib.escape(header_brand),
         "__WELCOME_TEXT__": htmllib.escape(header_text),
         "__WELCOME_BRAND__": htmllib.escape(header_brand),

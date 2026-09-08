@@ -14,6 +14,9 @@ const FIRSTUSE = '/var/luna/preferences/ran-firstuse';
 
 let fails = 0;
 let lastRedirect = 0;
+let foregroundApp = null;
+let retryTimer = null;
+let redirecting = false;
 
 function log(o) {
     try {
@@ -89,22 +92,36 @@ async function runProvision() {
 }
 
 async function redirectLoop() {
+    if (foregroundApp !== HOME_ID || redirecting) return;
     try {
+        if (fs.existsSync(BYPASS_FILE) &&
+            Date.now() < parseInt(fs.readFileSync(BYPASS_FILE, 'utf8'), 10)) return;
         if (Date.now() - lastRedirect < 8000) return;
+        redirecting = true;
         const r = await lunaLaunch(SELF_ID);
         if (r && r.returnValue) {
             fails = 0; lastRedirect = Date.now();
             log({ redirect: true });
         } else {
+            if (foregroundApp !== HOME_ID) return;
             fails++;
             const backoff = fails < 5 ? 2000 : Math.min(5 * 60 * 1000, 30000 * Math.pow(2, fails - 5));
             log({ redirectFail: true, fails, retryInMs: backoff });
-            setTimeout(redirectLoop, backoff);
+            retryTimer = setTimeout(() => {
+                retryTimer = null;
+                redirectLoop();
+            }, backoff);
         }
     } catch (e) { log({ tickErr: String((e && e.message) || e) }); }
+    finally { redirecting = false; }
 }
 
 async function onForeground(appId) {
+    foregroundApp = appId;
+    if (appId !== HOME_ID && retryTimer !== null) {
+        clearTimeout(retryTimer);
+        retryTimer = null;
+    }
     try {
         if (!appId || appId !== HOME_ID) { if (appId !== HOME_ID) fails = 0; return; }
         if (!fs.existsSync(FIRSTUSE)) return;
@@ -115,7 +132,7 @@ async function onForeground(appId) {
                 try { fs.unlinkSync(BYPASS_FILE); } catch (e) {}
             }
         } catch (e) {}
-        redirectLoop();
+        if (retryTimer === null) redirectLoop();
     } catch (e) { log({ tickErr: String((e && e.message) || e) }); }
 }
 
@@ -169,7 +186,11 @@ function watch() {
             } catch (e) { /* ignore invalid */ }
         }
     });
+    let reconnecting = false;
     const reconnect = (why) => {
+        // spawn failure fires both 'error' and 'close'; one reconnect per child
+        if (reconnecting) return;
+        reconnecting = true;
         log({ resubscribe: why });
         try { child.kill(); } catch (e) {}
         setTimeout(watch, 3000);
