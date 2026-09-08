@@ -113,6 +113,22 @@ test('settings cycle choices, toggles and accents; save errors are visible; acti
     app.click('[data-key="close"]'); assert.equal(app.document.querySelector('#settingsPanel').classList.contains('show'), false);
 });
 
+test('grouped settings keep remote navigation on controls across section headings', t => {
+    const app = appFor(t); ready(app); app.click('#settingsBtn');
+    assert.deepEqual([...app.document.querySelectorAll('#settingsRows h2')].map(el => el.textContent),
+        ['TV', 'Clock & status', 'Appearance', 'Apps', 'Preferences']);
+    const controls = [...app.document.querySelectorAll('#settingsRows .srow')];
+    assert.equal(app.document.activeElement, controls[0]);
+    for (let i = 1; i <= controls.length; i++) {
+        app.key(40); app.key(40, 'keyup');
+        assert.equal(app.document.activeElement, controls[i % controls.length]);
+    }
+    app.key(38); app.key(38, 'keyup');
+    assert.equal(app.document.activeElement, row(app, 'close'));
+    app.key(461);
+    assert.equal(app.document.querySelector('#settingsPanel').classList.contains('show'), false);
+});
+
 test('late preference replies cannot overwrite a newer local edit', t => {
     const app = appFor(t); app.tiles({ tiles: [video], inputs: [] });
     app.click('#settingsBtn'); app.click('[data-key="labels"]');

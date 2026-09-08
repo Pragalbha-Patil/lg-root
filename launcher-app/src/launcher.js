@@ -500,6 +500,7 @@
   var SETTING_ROWS = [
     {
       key: "tvsettings",
+      group: "TV",
       label: "TV settings",
       type: "action",
       fmt: function () {
@@ -508,6 +509,7 @@
     },
     {
       key: "showSystemStats",
+      group: "Clock & status",
       label: "System stats",
       type: "toggle",
       fmt: function (v) {
@@ -523,7 +525,12 @@
         return v;
       }
     },
-    { key: "accent", label: "Accent color", type: "accent" },
+    {
+      key: "accent",
+      group: "Appearance",
+      label: "Accent color",
+      type: "accent"
+    },
     {
       key: "tileSize",
       label: "Tile size",
@@ -543,6 +550,7 @@
     },
     {
       key: "sort",
+      group: "Apps",
       label: "Sort order",
       type: "choice",
       opts: M.choices.sort,
@@ -564,7 +572,8 @@
     },
     {
       key: "reset",
-      label: "Reset all",
+      group: "Preferences",
+      label: "Reset preferences",
       type: "action",
       fmt: function () {
         return "reset";
@@ -685,6 +694,9 @@
     for (i = 0; i < SETTING_ROWS.length; i++) {
       r = SETTING_ROWS[i];
       key = PREFS[r.key];
+      if (r.group) {
+        html.push('<h2 class="settings-group">' + esc(r.group) + "</h2>");
+      }
       if (r.type === "accent") {
         var dots = accentDots();
         html.push(
