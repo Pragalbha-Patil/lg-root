@@ -54,12 +54,15 @@ var PREFS_DEFAULTS = {
     clock24: false,
     sort: 'mru',
     pinned: [],
-    hidden: []
+    hidden: [],
+    showSystemStats: true,
+    dateFormat: 'HH:mm'
 };
 var PREFS_CHOICES = {
     accent: ['steel', 'emerald', 'violet', 'amber', 'crimson'],
     tileSize: ['compact', 'standard', 'large'],
-    sort: ['mru', 'alpha', 'pinned']
+    sort: ['mru', 'alpha', 'pinned'],
+    dateFormat: ['HH:mm', 'h:mm A', 'HH:mm:ss', 'h:mm:ss A', 'MMM D, HH:mm', 'MMM D, h:mm A', 'YYYY-MM-DD HH:mm', 'DD/MM/YYYY HH:mm']
 };
 function cleanPrefs(partial) {
     var out = {};
@@ -72,6 +75,10 @@ function cleanPrefs(partial) {
             out[k] = v.filter(function (x) { return typeof x === 'string' && x; }).slice(0, 30);
         } else if (k === 'hidden' && Array.isArray(v)) {
             out[k] = v.filter(function (x) { return typeof x === 'string' && x; }).slice(0, 60);
+        } else if (k === 'showSystemStats') {
+            out[k] = !!v;
+        } else if (k === 'dateFormat' && typeof v === 'string' && PREFS_CHOICES.dateFormat.indexOf(v) >= 0) {
+            out[k] = v;
         }
     });
     return out;

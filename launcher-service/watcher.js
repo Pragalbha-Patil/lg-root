@@ -98,6 +98,14 @@ function provisionSettingsIcon() {
 
 function collectSystemStats() {
     try {
+        // Read prefs to respect showSystemStats toggle
+        var showStats = true;
+        try {
+            var prefs = JSON.parse(fs.readFileSync('/media/developer/apps/usr/palm/services/org.minimal.home.service/prefs.json', 'utf8'));
+            showStats = prefs.showSystemStats !== false;
+        } catch (e) {}
+        if (!showStats) { return; }
+
         // CPU
         var cpuUsage = 0;
         var stat = fs.readFileSync('/proc/stat', 'utf8');

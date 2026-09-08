@@ -175,7 +175,7 @@ var SVC_LGHOME_M = "openLGHome";
 var SVC_STATS_M = "getSystemStats";
 
 var __mhTiles = []; window.__mhTiles = __mhTiles;
-var PREFS = { accent: "steel", tileSize: "standard", labels: true, clock24: false, sort: "mru", pinned: [], hidden: [] };
+var PREFS = { accent: "steel", tileSize: "standard", labels: true, clock24: false, sort: "mru", pinned: [], hidden: [], showSystemStats: true, dateFormat: "HH:mm" };
 var ACCENTS = {
   steel:   { name: "Steel",   main: "#8fb6ff", soft: "rgba(143,182,255,.35)" },
   emerald: { name: "Emerald", main: "#4ade9d", soft: "rgba(74,222,157,.35)" },
@@ -198,14 +198,31 @@ function tile4(id){
 }
 function dirOf(kc){ return kc === 37 ? "left" : kc === 39 ? "right" : kc === 38 ? "up" : kc === 40 ? "down" : null; }
 
-function tick(){
-  var n = new Date(), p = function(x){ return (x < 10 ? "0" : "") + x; };
+function formatDate(n, fmt){
+  var p = function(x){ return (x < 10 ? "0" : "") + x; };
+  var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   var days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-  var h = n.getHours(), ap = "";
-  if (!PREFS.clock24) { ap = h >= 12 ? "PM" : "AM"; h = h % 12; if (h === 0) h = 12; }
-  document.getElementById("clock").innerHTML =
-    (PREFS.clock24 ? p(h) : h) + ":" + p(n.getMinutes()) + " " + ap +
-    "<small>" + days[n.getDay()] + " " + p(n.getDate()) + "." + p(n.getMonth() + 1) + "</small>";
+  var h = n.getHours(), h12 = h % 12; if (h12 === 0) h12 = 12;
+  var ap = h >= 12 ? "PM" : "AM";
+  var Y = n.getFullYear(), M = n.getMonth() + 1, D = n.getDate();
+  var m = n.getMinutes(), s = n.getSeconds();
+  var dow = days[n.getDay()], mon = months[n.getMonth()];
+  var out = fmt;
+  out = out.replace("YYYY", Y).replace("YY", String(Y).slice(-2));
+  out = out.replace("MMMM", months[n.getMonth()]).replace("MMM", mon).replace("MM", p(M)).replace("M", M);
+  out = out.replace("DD", p(D)).replace("D", D);
+  out = out.replace("HH", p(h)).replace("H", h);
+  out = out.replace("hh", p(h12)).replace("h", h12);
+  out = out.replace("mm", p(m)).replace("m", m);
+  out = out.replace("ss", p(s)).replace("s", s);
+  out = out.replace("A", ap).replace("a", ap.toLowerCase());
+  out = out.replace("dddd", dow).replace("ddd", dow.slice(0, 3)).replace("dd", p(n.getDay() + 1)).replace("d", n.getDay() + 1);
+  return out;
+}
+function tick(){
+  var n = new Date();
+  var fmt = PREFS.dateFormat || "HH:mm";
+  document.getElementById("clock").innerHTML = formatDate(n, fmt) + "<small>" + formatDate(n, "ddd D MMM") + "</small>";
 }
 function applyPrefs(){
   var b = document.body;
@@ -215,6 +232,8 @@ function applyPrefs(){
   var a = ACCENTS[PREFS.accent] || ACCENTS.steel;
   b.style.setProperty("--accent", a.main);
   b.style.setProperty("--accent-soft", a.soft);
+  var statsEl = document.getElementById("sysStats");
+  if (statsEl) statsEl.style.display = PREFS.showSystemStats ? "flex" : "none";
   tick();
 }
 function persistFocus(){
@@ -318,11 +337,13 @@ function mkInitialEl(title){
 
 var SETTING_ROWS = [
   { key: "tvsettings", label: "TV settings", type: "action", fmt: function(){ return "open"; } },
+  { key: "showSystemStats", label: "System stats", type: "toggle", fmt: function(v){ return v ? "On" : "Off"; } },
+  { key: "dateFormat", label: "Date format", type: "choice", opts: ["HH:mm", "h:mm A", "HH:mm:ss", "h:mm:ss A", "MMM D, HH:mm", "MMM D, h:mm A", "YYYY-MM-DD HH:mm", "DD/MM/YYYY HH:mm"],
+    fmt: function(v){ return v; } },
   { key: "accent", label: "Accent color", type: "accent" },
   { key: "tileSize", label: "Tile size", type: "choice", opts: ["compact", "standard", "large"],
     fmt: function(v){ return v.charAt(0).toUpperCase() + v.slice(1); } },
   { key: "labels", label: "App labels", type: "toggle", fmt: function(v){ return v ? "On" : "Off"; } },
-  { key: "clock24", label: "Clock", type: "toggle", fmt: function(v){ return v ? "24-hour" : "12-hour"; } },
   { key: "sort", label: "Sort order", type: "choice", opts: ["mru", "alpha", "pinned"],
     fmt: function(v){ return v === "mru" ? "Most used" : v === "alpha" ? "Alphabetical" : "Pinned first"; } },
   { key: "manage", label: "Hidden apps", type: "action", fmt: function(){ return "open"; } },
@@ -333,7 +354,8 @@ function findRow(key){ for (var i = 0; i < SETTING_ROWS.length; i++) if (SETTING
 function commitPrefs(onDone){
   svcCall(SVC, SVC_PREFS_SET_M, {
     accent: PREFS.accent, tileSize: PREFS.tileSize, labels: PREFS.labels, clock24: PREFS.clock24,
-    sort: PREFS.sort, pinned: PREFS.pinned.slice(), hidden: PREFS.hidden.slice()
+    sort: PREFS.sort, pinned: PREFS.pinned.slice(), hidden: PREFS.hidden.slice(),
+    showSystemStats: PREFS.showSystemStats, dateFormat: PREFS.dateFormat
   }, function(){ if (onDone) onDone(); }, function(){ if (onDone) onDone(); });
 }
 function changeSetting(key, delta){
@@ -389,7 +411,7 @@ function renderSettings(){
   box.innerHTML = html.join("");
 }
 function resetAll(){
-  PREFS = { accent: "steel", tileSize: "standard", labels: true, clock24: false, sort: "mru", pinned: [], hidden: [] };
+  PREFS = { accent: "steel", tileSize: "standard", labels: true, clock24: false, sort: "mru", pinned: [], hidden: [], showSystemStats: true, dateFormat: "HH:mm" };
   applyPrefs(); renderSettings(); focusRow("reset");
   commitPrefs(function(){ refresh(); });
 }
@@ -401,6 +423,8 @@ function loadPrefs(){
       PREFS.tileSize = p.tileSize || PREFS.tileSize;
       if (typeof p.labels === "boolean") PREFS.labels = p.labels;
       if (typeof p.clock24 === "boolean") PREFS.clock24 = p.clock24;
+      if (typeof p.showSystemStats === "boolean") PREFS.showSystemStats = p.showSystemStats;
+      if (typeof p.dateFormat === "string") PREFS.dateFormat = p.dateFormat;
       PREFS.sort = p.sort || PREFS.sort;
       if (Array.isArray(p.pinned)) PREFS.pinned = p.pinned.slice();
       if (Array.isArray(p.hidden)) PREFS.hidden = p.hidden.slice();
@@ -726,7 +750,10 @@ document.addEventListener("click", function(e){
   activateRow(t);
 });
 
-tick(); setInterval(tick, 15000);
+function tickInterval(){
+  return /ss|s/.test(PREFS.dateFormat) ? 1000 : 15000;
+}
+tick(); setInterval(function(){ tick(); setInterval(arguments.callee, tickInterval()); }, tickInterval());
 var tries = 0;
 function applyHeader(h){
   if (!h) return;
