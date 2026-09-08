@@ -1,47 +1,126 @@
-"""Build Minimal Home: ATV-style sections + relay-service wiring."""
-import json, os, re, html as htmllib
+"""Build Minimal Home: ATV-style sections + relay-service wiring.
+
+Run `python build_launcher.py` to regenerate launcher-app/index.html and appinfo.json.
+Use `--check` to verify tracked outputs are up to date (CI gate).
+"""
+import argparse
+import json
+import os
+import sys
+import html as htmllib
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-tiles = json.load(open(os.path.join(BASE, "launcher-app", "tiles.json")))["launchPoints"]
-
-try:
-    cfg = json.load(open(os.path.join(BASE, "launcher-app", "config.json")))
-except Exception:
-    cfg = {}
-header_text = (cfg.get("header", {}).get("text") or "Welcome").upper()
-header_brand = cfg.get("header", {}).get("brand") or "Minimal Home"
-
+APP_DIR = os.path.join(BASE, "launcher-app")
+SVC_DIR = os.path.join(BASE, "launcher-service")
 SELF = "org.minimal.home"
-INPUT_IDS = {"com.webos.app.livetv", "com.webos.app.hdmi1", "com.webos.app.hdmi2",
-             "com.webos.app.hdmi3", "com.webos.app.hdmi4"}
-SYS_IDS = {"com.webos.app.discovery", "com.webos.app.mediadiscovery"}
+SETTINGS_ID = "com.palm.app.settings"
+SETTINGS_ICON = "/usr/palm/applications/com.palm.app.settings/icon.png"
+LG_HOME_ID = "__LGHOME__"
 
-apps, inputs, sysrow = [], [], []
-for lp in tiles:
-    i = lp.get("id", "")
-    if i == SELF or lp.get("hidden"):
-        continue
-    is_sys = bool(lp.get("systemApp"))
-    if is_sys and i not in INPUT_IDS and i not in SYS_IDS:
-        continue
-    if not is_sys and i in SYS_IDS:
-        continue
-    icon = lp.get("largeIcon") or lp.get("icon") or ""
-    t = {"id": i, "title": lp.get("title") or i,
-         "icon": icon,
-         "params": lp.get("params") if isinstance(lp.get("params"), dict) and lp.get("params") else None}
-    if i in INPUT_IDS:
-        inputs.append(t)
-    elif i in SYS_IDS:
-        sysrow.append(t)
-    else:
-        apps.append(t)
+DEFAULTS = {
+    "version": "1.0.0",
+    "header": {"text": "Welcome", "brand": "Minimal Home"},
+    "ui": {
+        "inputs": [
+            "com.webos.app.livetv",
+            "com.webos.app.hdmi1",
+            "com.webos.app.hdmi2",
+            "com.webos.app.hdmi3",
+            "com.webos.app.hdmi4",
+        ],
+        "system": [
+            "com.webos.app.discovery",
+            "com.webos.app.mediadiscovery",
+            SETTINGS_ID,
+        ],
+        "appsPriority": [
+            "youtube.leanback.v4", "netflix", "amazon", "hotstar",
+            "com.zee5.app", "com.apple.appletv", "io.strem.tv",
+            "org.mariotaku.ihsplay", "org.litefin.app",
+        ],
+    },
+}
 
-sysrow.append({"id": "com.palm.app.settings", "title": "Settings", "icon": "/usr/palm/applications/com.palm.app.settings/icon.png", "params": None})
-sysrow.append({"id": "__LGHOME__", "title": "LG Home", "icon": "", "params": None})
+
+def load_config():
+    cfg = dict(DEFAULTS)
+    p = os.path.join(APP_DIR, "config.json")
+    try:
+        with open(p, encoding="utf-8") as f:
+            user = json.load(f)
+    except Exception:
+        return cfg
+    if isinstance(user, dict):
+        for key in ("version", "ui"):
+            if key in user and isinstance(user[key], type(DEFAULTS[key])):
+                cfg[key] = user[key]
+        if isinstance(user.get("header"), dict):
+            cfg["header"] = dict(DEFAULTS["header"], **user["header"])
+    return cfg
+
+
+def load_tiles():
+    with open(os.path.join(APP_DIR, "tiles.json"), encoding="utf-8") as f:
+        data = json.load(f)
+    return data.get("launchPoints", [])
+
+
+def load_usage():
+    for p in (os.path.join(SVC_DIR, "usage.json"), os.path.join(APP_DIR, "usage.json")):
+        try:
+            with open(p, encoding="utf-8") as f:
+                u = json.load(f)
+            if isinstance(u, dict):
+                return u
+        except Exception:
+            continue
+    return {}
+
+
+def classify(tiles, cfg):
+    inputs_ids = {i for i in cfg["ui"]["inputs"] if i}
+    sys_ids = {s for s in cfg["ui"]["system"] if s}
+    apps, inputs, sysrow = [], [], []
+    for lp in tiles:
+        i = lp.get("id", "")
+        if i == SELF or lp.get("hidden"):
+            continue
+        is_sys = bool(lp.get("systemApp"))
+        if is_sys and i not in inputs_ids and i not in sys_ids:
+            continue
+        if not is_sys and i in sys_ids:
+            continue
+        t = {
+            "id": i,
+            "title": lp.get("title") or i,
+            "icon": lp.get("largeIcon") or lp.get("icon") or "",
+            "params": (lp.get("params")
+                       if isinstance(lp.get("params"), dict) and lp.get("params") else None),
+        }
+        if i in inputs_ids and i not in sys_ids:
+            inputs.append(t)
+        elif i in sys_ids:
+            sysrow.append(t)
+        else:
+            apps.append(t)
+    if SETTINGS_ID in sys_ids and not any(t["id"] == SETTINGS_ID for t in sysrow):
+        sysrow.append({"id": SETTINGS_ID, "title": "Settings",
+                       "icon": SETTINGS_ICON, "params": None})
+    sysrow.append({"id": LG_HOME_ID, "title": "LG Home", "icon": "", "params": None})
+    return apps, inputs, sysrow
+
+
+def sort_key(t, usage, priority):
+    if t["id"] in usage:
+        return (-1, -usage[t["id"]])
+    try:
+        return (0, priority.index(t["id"]))
+    except ValueError:
+        return (1, t["title"].lower())
+
 
 def tile_html(t):
-    if t["icon"]:
+    if t.get("icon"):
         art = '<img src="%s" alt="" data-title="%s">' % (t["icon"], htmllib.escape(t["title"], quote=True))
     else:
         art = '<div class="initial">%s</div>' % htmllib.escape((t["title"] or "?").strip()[:1].upper())
@@ -50,37 +129,18 @@ def tile_html(t):
             % (htmllib.escape(t["id"]), htmllib.escape(json.dumps(t["params"]) if t["params"] else ""),
                art, htmllib.escape(t["title"])))
 
-PRIORITY = ["youtube.leanback.v4", "netflix", "amazon", "hotstar", "com.zee5.app",
-            "com.apple.appletv", "io.strem.tv", "org.mariotaku.ihsplay", "org.litefin.app"]
 
-USAGE = {}
-try:
-    import json as _json, os as _os
-    _up = _os.path.join(BASE, "launcher-app", "usage.json")
-    if _os.path.exists(_up):
-        USAGE = _json.load(open(_up))
-        print("baking MRU order for", len(USAGE), "apps")
-except Exception as _e:
-    print("no usage data:", _e)
-
-def sort_key(t):
-    if t["id"] in USAGE:
-        return (-1, -USAGE[t["id"]])
-    try:
-        return (0, PRIORITY.index(t["id"]))
-    except ValueError:
-        return (1, t["title"].lower())
-
-def section_html(tiles, sort=False):
-    ts = sorted(tiles, key=sort_key) if sort else tiles
+def section_html(tiles, usage, priority, sort=False):
+    ts = sorted(tiles, key=lambda t: sort_key(t, usage, priority)) if sort else tiles
     return "\n".join(tile_html(t) for t in ts)
 
-html = """<!DOCTYPE html>
+
+TEMPLATE = """<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Minimal Home</title>
+<title>__MH_TITLE__</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
@@ -136,7 +196,7 @@ __SYS__
 try { if (window.PalmSystem && PalmSystem.stageReady) PalmSystem.stageReady(); } catch (e) {}
 
 var SVC = "luna://org.minimal.home.service";
-var BUILD = "v9-mru"; window.__MHBUILD = BUILD;
+var BUILD = "__MH_VERSION__"; window.__MHBUILD = BUILD;
 var SVC_LIST_M = "getTiles";
 var SVC_LAUNCH_M = "launchApp";
 function svcCall(uri, method, params, onOk, onErr){
@@ -199,9 +259,9 @@ function tileEl(t){
   d.addEventListener("click", function(){ doLaunch(d); });
   return d;
 }
-var INPUT_IDS = ["com.webos.app.livetv","com.webos.app.hdmi1","com.webos.app.hdmi2","com.webos.app.hdmi3","com.webos.app.hdmi4"];
-var SYS_IDS = ["com.webos.app.discovery","com.webos.app.mediadiscovery","com.palm.app.settings"];
-var SETTINGS_TILE = { id: "com.palm.app.settings", title: "Settings", icon: "icons/settings.png", params: null };
+var INPUT_IDS = __MH_INPUT_IDS__;
+var SYS_IDS = __MH_SYS_IDS__;
+var SETTINGS_TILE = __MH_SETTINGS_TILE__;
 function rebuild(tiles){
   var grid = document.getElementById("grid");
   var inputs = document.getElementById("inputs");
@@ -215,7 +275,7 @@ function rebuild(tiles){
     else if (SYS_IDS.indexOf(t.id) >= 0) { sysrow.appendChild(el); added.sys++; }
     else { grid.appendChild(el); added.grid++; }
   });
-  if (!sysrow.querySelector('[data-id="com.palm.app.settings"]')) sysrow.appendChild(tileEl(SETTINGS_TILE));
+  if (SETTINGS_TILE && !sysrow.querySelector('[data-id="com.palm.app.settings"]')) sysrow.appendChild(tileEl(SETTINGS_TILE));
   var first = document.querySelector("#grid .tile");
   try { if (first && !document.activeElement) first.focus(); } catch (e) {}
   return added;
@@ -315,11 +375,85 @@ window.addEventListener("focus", function(){ tries = 0; refresh(); });
 </html>
 """
 
-html = (html.replace("__APPS__", section_html(apps, sort=True))
-            .replace("__INPUTS__", section_html(inputs))
-            .replace("__SYS__", section_html(sysrow))
-            .replace("__TAG__", "i"))
-html = (html.replace("__WELCOME_TEXT__", htmllib.escape(header_text))
-        .replace("__WELCOME_BRAND__", htmllib.escape(header_brand)))
-open(os.path.join(BASE, "launcher-app", "index.html"), "w", encoding="utf-8").write(html)
-print(f"baked apps={len(apps)} inputs={len(inputs)} sys={len(sysrow)}")
+
+def build(version=None):
+    cfg = load_config()
+    usage = load_usage()
+    apps, inputs, sysrow = classify(load_tiles(), cfg)
+    version = version or cfg.get("version") or "1.0.0"
+
+    header_text = (cfg.get("header", {}).get("text") or "Welcome").upper()
+    header_brand = cfg.get("header", {}).get("brand") or "Minimal Home"
+    sys_ids = [s for s in cfg["ui"]["system"] if s]
+    settings_tile = {"id": SETTINGS_ID, "title": "Settings",
+                     "icon": SETTINGS_ICON, "params": None}
+
+    inject = {
+        "__MH_VERSION__": "v" + version,
+        "__MH_INPUT_IDS__": json.dumps([i for i in cfg["ui"]["inputs"] if i]),
+        "__MH_SYS_IDS__": json.dumps(sys_ids),
+        "__MH_SETTINGS_TILE__": json.dumps(settings_tile),
+        "__MH_TITLE__": htmllib.escape(header_brand),
+        "__WELCOME_TEXT__": htmllib.escape(header_text),
+        "__WELCOME_BRAND__": htmllib.escape(header_brand),
+    }
+
+    priority = [p for p in cfg["ui"]["appsPriority"] if p]
+    html = TEMPLATE
+    html = (html.replace("__APPS__", section_html(apps, usage, priority, sort=True))
+                .replace("__INPUTS__", section_html(inputs, usage, priority))
+                .replace("__SYS__", section_html(sysrow, usage, priority))
+                .replace("__TAG__", "i"))
+    for key, value in inject.items():
+        html = html.replace(key, value)
+    if "__MH_" in html or "__WELCOME_" in html or "__APPS__" in html:
+        raise RuntimeError("unresolved template placeholders in index.html")
+
+    with open(os.path.join(APP_DIR, "appinfo.json"), encoding="utf-8") as f:
+        appinfo = json.load(f)
+    appinfo["version"] = version
+
+    out = {
+        "launcher-app/index.html": html,
+        "launcher-app/appinfo.json": json.dumps(appinfo, indent=2) + "\n",
+    }
+    return out, (len(apps), len(inputs), len(sysrow)), usage
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description="Build Minimal Home launcher")
+    ap.add_argument("--check", action="store_true",
+                    help="verify committed build output is up to date (no writes)")
+    ap.add_argument("--version", default=None, help="override version")
+    args = ap.parse_args(argv)
+
+    out, (na, ni, ns), usage = build(args.version)
+
+    diffs = []
+    for rel, content in out.items():
+        path = os.path.join(BASE, rel)
+        try:
+            with open(path, encoding="utf-8") as f:
+                current = f.read()
+        except OSError:
+            current = None
+        if current != content:
+            diffs.append(rel)
+            if not args.check:
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(content)
+
+    print("baked apps=%d inputs=%d sys=%d" % (na, ni, ns))
+    if usage:
+        print("baking MRU order for %d apps" % len(usage))
+    if args.check:
+        if diffs:
+            print("STALE OUTPUT: " + ", ".join(diffs) + " (run python build_launcher.py)")
+            return 1
+        print("up-to-date")
+        return 0
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

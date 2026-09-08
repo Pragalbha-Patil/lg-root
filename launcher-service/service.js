@@ -1,6 +1,10 @@
 var Service = require('webos-service');
 var fs = require('fs');
-var LOG = '/tmp/minhome-svc.log';
+var C = require('./constants');
+var LOG = C.SVC_LOG;
+var USAGE_FILE = C.USAGE_FILE;
+var CONFIG_FILE = C.CONFIG_FILE;
+var SELF_ID = C.SELF_ID;
 
 function log(o) {
     o.ts = Date.now();
@@ -10,8 +14,6 @@ function log(o) {
         try { if (fs.statSync(LOG).size > 100000) fs.writeFileSync(LOG, line); } catch (e) {}
     } catch (e) {}
 }
-
-var USAGE_FILE = require('path').join(__dirname, 'usage.json');
 function loadUsage() {
     try { return JSON.parse(fs.readFileSync(USAGE_FILE, 'utf8')); }
     catch (e) { return {}; }
@@ -39,9 +41,18 @@ function saveUsage(u) {
 
 var service = new Service('org.minimal.home.service');
 
-var ALLOW_SYSTEM = ['com.webos.app.livetv',
-    'com.webos.app.hdmi1', 'com.webos.app.hdmi2', 'com.webos.app.hdmi3', 'com.webos.app.hdmi4',
-    'com.webos.app.mediadiscovery', 'com.webos.app.discovery'];
+function loadConfig() {
+    try {
+        var cfg = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+        return (cfg && typeof cfg === 'object') ? cfg : {};
+    } catch (e) { return {}; }
+}
+var ALLOW_SYSTEM = (function () {
+    var u = loadConfig();
+    var ui = (u && u.ui) || {};
+    var list = (ui.system || []).concat(ui.inputs || []);
+    return list.filter(function (x) { return typeof x === 'string' && x; });
+})();
 
 service.register('getTiles', function (msg) {
     try {
@@ -51,7 +62,7 @@ service.register('getTiles', function (msg) {
                 var usage = loadUsage();
                 var out = [];
                 (p.launchPoints || []).forEach(function (lp) {
-                    if (!lp || lp.hidden || lp.id === 'org.minimal.home') return;
+                    if (!lp || lp.hidden || lp.id === SELF_ID) return;
                     if (lp.systemApp && ALLOW_SYSTEM.indexOf(lp.id) < 0) return;
                     out.push({
                         id: lp.id,
@@ -76,13 +87,21 @@ service.register('getTiles', function (msg) {
     }
 });
 
+var LAUNCH_PARAM_ALLOW = ['PhysicalAddress', 'uniqueId', 'value', 'displayId'];
+var CALLER = 'org.minimal.home';
+
 service.register('launchApp', function (msg) {
     try {
         var pl = msg.payload || {};
-        var p = { id: pl.id, callerId: 'org.minimal.home' };
-        if (pl.params) {
+        var caller = (msg.callerId || '').toString();
+        log({ m: 'launchApp-caller', caller: caller });
+        var p = { id: pl.id, callerId: CALLER };
+        if (pl.params && typeof pl.params === 'object') {
             for (var k in pl.params) {
-                if (Object.prototype.hasOwnProperty.call(pl.params, k) && k !== 'id') p[k] = pl.params[k];
+                if (!Object.prototype.hasOwnProperty.call(pl.params, k)) continue;
+                if (k === 'id') continue;
+                if (LAUNCH_PARAM_ALLOW.indexOf(k) < 0) continue;
+                p[k] = pl.params[k];
             }
         }
         p.id = pl.id;
@@ -105,8 +124,8 @@ service.register('launchApp', function (msg) {
 
 service.register('openLGHome', function (msg) {
     try {
-        fs.writeFileSync(require('path').join(__dirname, '.noredirect'), String(Date.now() + 10*60*1000));
-        service.call('luna://com.webos.applicationManager/launch', { id: 'com.webos.app.home' }, function (res) {
+        fs.writeFileSync(C.BYPASS_FILE, String(Date.now() + 10*60*1000));
+        service.call('luna://com.webos.applicationManager/launch', { id: C.HOME_ID }, function (res) {
             var rp = (res && res.payload) || {};
             log({ m: 'openLGHome', ok: !!rp.returnValue });
             msg.respond(rp.returnValue !== undefined ? rp : { returnValue: false });

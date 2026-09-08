@@ -72,7 +72,7 @@ h1 b{font-weight:700}
 try { if (window.PalmSystem && PalmSystem.stageReady) PalmSystem.stageReady(); } catch (e) {}
 
 var SVC = "luna://org.minimal.home.service";
-var BUILD = "v9-mru"; window.__MHBUILD = BUILD;
+var BUILD = "v1.0.3"; window.__MHBUILD = BUILD;
 var SVC_LIST_M = "getTiles";
 var SVC_LAUNCH_M = "launchApp";
 function svcCall(uri, method, params, onOk, onErr){
@@ -135,9 +135,9 @@ function tileEl(t){
   d.addEventListener("click", function(){ doLaunch(d); });
   return d;
 }
-var INPUT_IDS = ["com.webos.app.livetv","com.webos.app.hdmi1","com.webos.app.hdmi2","com.webos.app.hdmi3","com.webos.app.hdmi4"];
-var SYS_IDS = ["com.webos.app.discovery","com.webos.app.mediadiscovery","com.palm.app.settings"];
-var SETTINGS_TILE = { id: "com.palm.app.settings", title: "Settings", icon: "icons/settings.png", params: null };
+var INPUT_IDS = ["com.webos.app.livetv", "com.webos.app.hdmi1", "com.webos.app.hdmi2", "com.webos.app.hdmi3", "com.webos.app.hdmi4"];
+var SYS_IDS = ["com.webos.app.discovery", "com.webos.app.mediadiscovery", "com.palm.app.settings"];
+var SETTINGS_TILE = {"id": "com.palm.app.settings", "title": "Settings", "icon": "/usr/palm/applications/com.palm.app.settings/icon.png", "params": null};
 function rebuild(tiles){
   var grid = document.getElementById("grid");
   var inputs = document.getElementById("inputs");
@@ -151,7 +151,7 @@ function rebuild(tiles){
     else if (SYS_IDS.indexOf(t.id) >= 0) { sysrow.appendChild(el); added.sys++; }
     else { grid.appendChild(el); added.grid++; }
   });
-  if (!sysrow.querySelector('[data-id="com.palm.app.settings"]')) sysrow.appendChild(tileEl(SETTINGS_TILE));
+  if (SETTINGS_TILE && !sysrow.querySelector('[data-id="com.palm.app.settings"]')) sysrow.appendChild(tileEl(SETTINGS_TILE));
   var first = document.querySelector("#grid .tile");
   try { if (first && !document.activeElement) first.focus(); } catch (e) {}
   return added;

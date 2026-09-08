@@ -1,6 +1,32 @@
 {
+    "version": "1.0.3",
     "header": {
         "text": "Welcome",
         "brand": "Minimal Home"
+    },
+    "ui": {
+        "inputs": [
+            "com.webos.app.livetv",
+            "com.webos.app.hdmi1",
+            "com.webos.app.hdmi2",
+            "com.webos.app.hdmi3",
+            "com.webos.app.hdmi4"
+        ],
+        "system": [
+            "com.webos.app.discovery",
+            "com.webos.app.mediadiscovery",
+            "com.palm.app.settings"
+        ],
+        "appsPriority": [
+            "youtube.leanback.v4",
+            "netflix",
+            "amazon",
+            "hotstar",
+            "com.zee5.app",
+            "com.apple.appletv",
+            "io.strem.tv",
+            "org.mariotaku.ihsplay",
+            "org.litefin.app"
+        ]
     }
 }

@@ -5,11 +5,8 @@
 // No polling: zero CPU when idle, reacts instantly.
 const { execFile, spawn } = require('child_process');
 const fs = require('fs');
+const { BYPASS_FILE, WATCH_LOG: LOG, HOME_ID, SELF_ID } = require('./constants');
 
-const LOG = '/tmp/minhome-watch.log';
-const BYPASS = '/media/developer/apps/usr/palm/services/org.minimal.home.service/.noredirect';
-const HOME = 'com.webos.app.home';
-const MINE = 'org.minimal.home';
 const FIRSTUSE = '/var/luna/preferences/ran-firstuse';
 
 let fails = 0;
@@ -35,27 +32,34 @@ function lunaLaunch(id) {
     });
 }
 
-async function onForeground(appId) {
+async function redirectLoop() {
     try {
-        if (!appId || appId !== HOME) { if (appId !== HOME) fails = 0; return; }
-        if (!fs.existsSync(FIRSTUSE)) return;
-        try {
-            if (fs.existsSync(BYPASS)) {
-                const exp = parseInt(fs.readFileSync(BYPASS, 'utf8'), 10);
-                if (Date.now() < exp) return;
-                try { fs.unlinkSync(BYPASS); } catch (e) {}
-            }
-        } catch (e) {}
         if (Date.now() - lastRedirect < 8000) return;
-        const r = await lunaLaunch(MINE);
+        const r = await lunaLaunch(SELF_ID);
         if (r && r.returnValue) {
             fails = 0; lastRedirect = Date.now();
             log({ redirect: true });
         } else {
             fails++;
-            log({ redirectFail: true, fails });
-            if (fails >= 5) { log({ givingUp: true }); process.exit(2); }
+            const backoff = fails < 5 ? 2000 : Math.min(5 * 60 * 1000, 30000 * Math.pow(2, fails - 5));
+            log({ redirectFail: true, fails, retryInMs: backoff });
+            setTimeout(redirectLoop, backoff);
         }
+    } catch (e) { log({ tickErr: String((e && e.message) || e) }); }
+}
+
+async function onForeground(appId) {
+    try {
+        if (!appId || appId !== HOME_ID) { if (appId !== HOME_ID) fails = 0; return; }
+        if (!fs.existsSync(FIRSTUSE)) return;
+        try {
+            if (fs.existsSync(BYPASS_FILE)) {
+                const exp = parseInt(fs.readFileSync(BYPASS_FILE, 'utf8'), 10);
+                if (Date.now() < exp) { fails = 0; return; }
+                try { fs.unlinkSync(BYPASS_FILE); } catch (e) {}
+            }
+        } catch (e) {}
+        redirectLoop();
     } catch (e) { log({ tickErr: String((e && e.message) || e) }); }
 }
 

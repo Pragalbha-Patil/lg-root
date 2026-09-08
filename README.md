@@ -87,15 +87,28 @@ luna-send -n 1 luna://com.webos.applicationManager/listLaunchPoints '{}'
 
 ## Install on the TV
 
-No credentials or deployment script are bundled in this repository (your TV's address,
-SSH credentials and personal tooling stay out of the public tree). Deploy via plain
-`scp`/`ssh` as `root` on your rooted TV:
+No credentials are bundled in this repository (your TV's address, SSH credentials and
+personal tooling stay out of the public tree). Deploy via `ssh`/`scp` as `root` on your rooted TV.
+Two ways:
+
+**Option A - installer script** (recommended). Credential-free: supply only the TV address.
+Point it at your TV via an `~/.ssh/config` host alias or `TV_HOST`:
+
+```sh
+TV_HOST=mytv ./tools/install.sh          # build + deploy + relaunch
+TV_HOST=mytv ./tools/install.sh --check  # verify target paths, change nothing
+```
+
+The installer reads `TV_USER` (default `root`), `APP_ID` and `SVC_ID` from the environment,
+never hardcodes a password, and can be run non-interactively alongside a boot hook.
+
+**Option B - manual `scp`.** Use the trailing `/./` to flatten a directory into its target:
 
 ```sh
 # 1. Build the app locally
 python build_launcher.py
 
-# 2. Upload the app (the trailing /./ flattens launcher-app into the target dir)
+# 2. Upload the app
 ssh root@<TV-IP> "mkdir -p /media/developer/apps/usr/palm/applications/org.minimal.home"
 scp -r launcher-app/. root@<TV-IP>:/media/developer/apps/usr/palm/applications/org.minimal.home/
 
@@ -132,24 +145,30 @@ setsid node /media/developer/apps/usr/palm/services/org.minimal.home.service/wat
 
 `text` is rendered small-and-regular, `brand` is rendered bold. Rebuild and redeploy to apply.
 
-### System app allowlist — `launcher-service/service.js`
+### System app allowlist — `launcher-app/config.json`
 
 Only these system (non-third-party) apps are exposed as tiles. Everything else from the TV
-(apps you installed, HDMI bookmarks) is shown automatically.
+(apps you installed, HDMI bookmarks) is shown automatically. `launcher-service/service.js` loads
+this from the **same** `config.json` the build uses, so the live tile list and the baked page
+can't drift:
 
-```js
-var ALLOW_SYSTEM = ['com.webos.app.livetv',
-    'com.webos.app.hdmi1', 'com.webos.app.hdmi2', 'com.webos.app.hdmi3', 'com.webos.app.hdmi4',
-    'com.webos.app.mediadiscovery', 'com.webos.app.discovery'];
+```json
+"ui": {
+  "inputs": ["com.webos.app.livetv", "com.webos.app.hdmi1", "com.webos.app.hdmi2", "com.webos.app.hdmi3", "com.webos.app.hdmi4"],
+  "system": ["com.webos.app.discovery", "com.webos.app.mediadiscovery", "com.palm.app.settings"]
+}
 ```
 
-Add a `com.webos.app.*` id here if you want a particular system app to appear as a tile.
+Add a `com.webos.app.*` id to `inputs` or `system` if you want a particular system app to appear
+as a tile. `inputs` row order follows the array, `system` lets the Settings tile be optional.
 
 ### Most-recently-used ordering
 
 `launcher-service/service.js` records every successful app launch to `usage.json` next to the
 service (capped to 60 entries). `getTiles` sorts by that stamp, newest first, then by the
-priority list in `build_launcher.py`, then alphabetically.
+priority list in `launcher-app/config.json` (`ui.appsPriority`), then alphabetically. When you
+rebuild locally, `build_launcher.py` bakes that same MRU order from `launcher-service/usage.json`
+so the static page matches the live list.
 
 ## How it works
 

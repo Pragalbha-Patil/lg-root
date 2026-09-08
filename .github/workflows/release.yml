@@ -1,0 +1,28 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build launcher
+        run: python build_launcher.py && python build_launcher.py --check
+      - name: Package app + service
+        run: |
+          mkdir -p dist
+          cp -r launcher-app launcher-service dist/
+          tar -C dist -czf "minimal-home-${GITHUB_REF_NAME}.tar.gz" launcher-app launcher-service
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: "minimal-home-*.tar.gz"
+          generate_release_notes: true
