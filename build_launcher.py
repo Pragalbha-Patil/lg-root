@@ -20,7 +20,7 @@ LG_HOME_ID = "__LGHOME__"
 
 DEFAULTS = {
     "version": "1.0.0",
-    "header": {"text": "Welcome", "brand": "Minimal Home"},
+    "header": {"text": "Welcome", "brand": "PSP"},
     "ui": {
         "system": [
             "com.webos.app.discovery",

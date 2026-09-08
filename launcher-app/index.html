@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Minimal Home</title>
+<title>PSP</title>
 <style>
 :root{--accent:#8fb6ff;--accent-soft:rgba(143,182,255,.35);--tile-art-h:126px;--tile-icon:104px;--tile-label:22px;--grid-min:310px}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -62,7 +62,7 @@ h1 b{font-weight:700}
 </head>
 <body>
 <header>
-<h1>WELCOME <b>Minimal Home</b></h1>
+<h1>WELCOME <b>PSP</b></h1>
 <div class="hright">
 <div id="settingsBtn" class="tile" tabindex="0" role="button" aria-label="Settings"><span class="gear">&#9881;</span><span>Settings</span></div>
 <div id="clock">--:--<small></small></div>
@@ -115,7 +115,7 @@ h1 b{font-weight:700}
 try { if (window.PalmSystem && PalmSystem.stageReady) PalmSystem.stageReady(); } catch (e) {}
 
 var SVC = "luna://org.minimal.home.service";
-var BUILD = "v1.2.1"; window.__MHBUILD = BUILD;
+var BUILD = "v1.3.0"; window.__MHBUILD = BUILD;
 var SVC_LIST_M = "getTiles";
 var SVC_LAUNCH_M = "launchApp";
 function svcCall(uri, method, params, onOk, onErr){
