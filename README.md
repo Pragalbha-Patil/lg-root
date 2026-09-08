@@ -199,24 +199,36 @@ remote for shots that need the focus highlight.
 
 Two components run on the TV plus one build-time generator on your computer:
 
-```
-                    ┌───────────────────────── your computer ─────────────────────────┐
-                    │  build_launcher.py   ── reads ──►  tiles.json + config.json    │
-                    │        │  writes the boot-baked static HTML render             │
-                    └────────┼───────────────────────────────────────────────────────┘
-                             ▼
-┌────────────────────────────────────────── webOS TV ──────────────────────────────────────┐
-│  org.minimal.home  (web app)                        org.minimal.home.service  (Node)      │
-│  ┌─────────────────────────┐                        ┌───────────────────────────────────┐  │
-│  │ index.html + spatial-nav│  hello on boot ─────►  │ getTiles     live tile list + MRU │  │
-│  │ static tiles → live     │  ◄───────────────      │ launchApp    intercept + record   │  │
-│  │ build, re-sort on focus │                        │ openLGHome   bypass (10 min)      │  │
-│  └───────────┬─────────────┘                        └───────────────┬───────────────────┘  │
-│              │        foreground change (stock Home opened)        │                        │
-│              │   ◄─────────────────────────────────────────────────┼────────────────────── │
-│              │   watcher.js (event-driven, no polling) ────────────┘                        │
-│              │        └─► re-launch org.minimal.home unless bypassed                        │
-└──────────────────────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph pc["Your computer"]
+        source["tiles.json + config.json"]
+        build["build_launcher.py"]
+        baked["index.html — boot-baked static render"]
+    end
+
+    subgraph tv["webOS TV"]
+        app["org.minimal.home (web app)<br/>index.html + spatial-nav.js"]
+        svc["org.minimal.home.service (Node)<br/>getTiles · launchApp · openLGHome"]
+        watch["watcher.js<br/>(event-driven, no polling)"]
+        icons["icons/&lt;id&gt;.png — app-local icon copies"]
+        lps["installed apps (launch points)"]
+    end
+
+    source -->|read| build
+    build -->|writes| baked
+    baked -->|scp / tools/install.sh| app
+
+    app -->|getTiles: live tile list + MRU| svc
+    app -->|launchApp: intercept + record MRU| svc
+    app -->|openLGHome: bypass for 10 min| svc
+    app -->|img src = relative path| icons
+
+    lps -->|listLaunchPoints| svc
+    lps -->|icon files| watch
+    watch -->|provisions every 5 min| icons
+
+    watch -->|foreground change: stock Home opened| app
 ```
 
 1. **Build time** — `build_launcher.py` bakes a clean, static launcher from a launch-point
