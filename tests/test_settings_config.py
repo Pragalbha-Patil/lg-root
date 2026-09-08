@@ -15,6 +15,6 @@ class SettingsConfigTest(unittest.TestCase):
         _, _, system = bl.classify([], cfg)
         self.assertNotIn(bl.SETTINGS_ID, [tile["id"] for tile in system])
 
-    def test_default_settings_fallback_still_present(self):
+    def test_default_settings_action_metadata_still_present(self):
         output, _, _ = bl.build()
         self.assertIn('"settingsTile": {"id": "com.palm.app.settings"', output["launcher-app/index.html"])

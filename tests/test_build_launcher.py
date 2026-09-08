@@ -147,6 +147,14 @@ class TemplateTest(unittest.TestCase):
         self.assertNotIn('</script><script>alert(1)', output['launcher-app/index.html'])
         self.assertIn('\\u003c/script>', output['launcher-app/index.html'])
 
+    def test_default_build_does_not_read_sample_tiles(self):
+        with patch.object(bl, 'load_tiles', side_effect=AssertionError('sample read')):
+            out, counts, _ = bl.build()
+        self.assertEqual(counts, (0, 0, 0))
+        body = out['launcher-app/index.html'].split('<script>')[0]
+        self.assertNotIn('data-id=', body)
+        self.assertIn('Loading apps, inputs and system from TV', body)
+
     def test_all_placeholders_substituted(self):
         out, _, _ = bl.build()
         html = out["launcher-app/index.html"]
@@ -172,7 +180,7 @@ class TemplateTest(unittest.TestCase):
         self.assertNotIn('src="icons/settings.png"', out["launcher-app/index.html"])
 
     def test_settings_tile_uses_provisioned_icon(self):
-        out, _, _ = bl.build()
+        out, _, _ = bl.build(preview=True)
         self.assertIn("icons/com.palm.app.settings.png", out["launcher-app/index.html"])
         self.assertNotIn("/usr/palm/applications/com.palm.app.settings/icon.png",
                          out["launcher-app/index.html"])
@@ -181,7 +189,7 @@ class TemplateTest(unittest.TestCase):
     def test_baked_icons_are_app_relative_not_absolute(self):
         # file:// blocks absolute icon paths (issue #17): baked tiles must use
         # the same icons/<id>.png mechanism as the live getTiles response.
-        out, _, _ = bl.build()
+        out, _, _ = bl.build(preview=True)
         html = out["launcher-app/index.html"]
         self.assertIn('src="icons/youtube.leanback.v4.png"', html)
         self.assertNotIn("/media/cryptofs/apps/", html)

@@ -26,7 +26,7 @@ Example greeting:
 ```
 
 Missing fields inherit defaults. Invalid JSON, wrong field types, and invalid
-version strings fail the build. The committed fallback banner remains generic;
+version strings fail the build. The committed startup banner remains generic;
 the live relay supplies the configured greeting.
 
 Inputs are discovered from the TV's launch points. Do not add a fixed HDMI list
@@ -49,22 +49,23 @@ with pinned apps first and configured priority as a fallback. Pinned first ignor
 recency and uses configured priority/title after pins. Alphabetical ignores pin
 ordering. Pin badges remain visible in every mode.
 
-## Fallback tiles and personal usage
+## Desktop preview tiles and personal usage
 
-`launcher-app/tiles.json` is a public sample snapshot. Live tiles replace the
-fallback when the relay answers, so it need not match every TV. Missing desktop
-icons are expected because the watcher provisions app-local icons on the device.
+`launcher-app/tiles.json` is a public sample snapshot used only with `--preview`.
+Normal builds start with a loading indicator and populate the rows from the TV.
+System app IDs in the config filter live results; they do not create tiles.
+Missing desktop icons are expected because the watcher provisions app-local icons on the device.
 
 Default builds use only public inputs. To bake a personal recent-app ordering:
 
 ```sh
-python build_launcher.py --usage private/usage.json
+python build_launcher.py --preview --usage private/usage.json
 ```
 
 Supply a JSON object mapping app IDs to nonnegative integer launch sequence
 values. There is no automatic lookup of `usage.json` in app or service directories.
 
-Personal output is for local preview or a separately managed deployment.
+Sample and personal output are for local desktop preview.
 The installer and release packager require the default reproducible build and
 will reject a personalized page that differs. Before opening a PR, restore it:
 

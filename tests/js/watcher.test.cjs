@@ -147,3 +147,27 @@ test('periodic provisioning requests launch points and copies the returned icons
     const task = w.context.runProvision(); w.respond({ returnValue: true, launchPoints: [{ id: 'video', icon: '/icon' }] }); await task;
     assert.ok(w.disk.files.has(C.APP_DIR + '/icons/video.png'));
 });
+
+
+test('a real foreground transition permits immediate return without the old cooldown', async () => {
+    for (const appId of [C.SELF_ID, 'video', 'com.webos.app.hdmi1']) {
+        const w = watcher();
+        w.context.onForeground(C.HOME_ID); w.respond({ returnValue: true }); await flush();
+        await w.context.onForeground(appId);
+        w.advance(100);
+        w.context.onForeground(C.HOME_ID);
+        assert.equal(w.calls.length, 2);
+        w.respond({ returnValue: true }); await flush();
+        w.context.onForeground(C.HOME_ID);
+        assert.equal(w.calls.length, 2, 'duplicate Home events stay rate limited');
+    }
+});
+
+test('late launch success cannot restore a cooldown after the launcher reached foreground', async () => {
+    const w = watcher();
+    w.context.onForeground(C.HOME_ID);
+    await w.context.onForeground(C.SELF_ID);
+    w.respond({ returnValue: true }); await flush();
+    w.context.onForeground(C.HOME_ID);
+    assert.equal(w.calls.length, 2);
+});

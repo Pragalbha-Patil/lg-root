@@ -68,7 +68,9 @@ class BuildInputsTest(unittest.TestCase):
             with patch.object(bl, "SVC_DIR", temp):
                 self.assertEqual(bl.load_usage(), {})
                 self.assertEqual(bl.load_usage(path), {"netflix": 42})
-                output, _, usage = bl.build(usage_path=path)
+                with self.assertRaisesRegex(ValueError, "--usage requires --preview"):
+                    bl.build(usage_path=path)
+                output, _, usage = bl.build(usage_path=path, preview=True)
                 self.assertEqual(usage, {"netflix": 42})
                 page = output["launcher-app/index.html"]
                 self.assertLess(page.index('data-id="netflix"'), page.index('data-id="youtube.leanback.v4"'))
