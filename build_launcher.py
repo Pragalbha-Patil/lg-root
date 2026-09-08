@@ -446,7 +446,8 @@ var SETTING_ROWS = [
   { key: "sort", label: "Sort order", type: "choice", opts: ["mru", "alpha", "pinned"],
     fmt: function(v){ return v === "mru" ? "Most used" : v === "alpha" ? "Alphabetical" : "Pinned first"; } },
   { key: "manage", label: "Hidden apps", type: "action", fmt: function(){ return "open"; } },
-  { key: "reset", label: "Reset all", type: "action", fmt: function(){ return "reset"; } }
+  { key: "reset", label: "Reset all", type: "action", fmt: function(){ return "reset"; } },
+  { key: "close", label: "Close panel", type: "action", fmt: function(){ return "close"; } }
 ];
 function findRow(key){ for (var i = 0; i < SETTING_ROWS.length; i++) if (SETTING_ROWS[i].key === key) return SETTING_ROWS[i]; return null; }
 function commitPrefs(onDone){
@@ -559,7 +560,7 @@ function openOptions(el){
   var id = el.getAttribute("data-id");
   var label = (el.querySelector && el.querySelector(".label")) ? el.querySelector(".label").textContent : id;
   var pinned = PREFS.pinned.indexOf(id) >= 0;
-  var rows = [ "Pin", "Hide app", "Launch" ];
+  var rows = [ "Pin", "Hide app", "Launch", "Close" ];
   if (pinned) rows[0] = "Unpin";
   document.getElementById("optionsRows").innerHTML = rows.map(function(l){
     return '<div class="optrow" tabindex="0" data-id="' + esc(id) + '"><span class="sl">' + l + '</span></div>';
@@ -576,6 +577,7 @@ function openManage(){
     var pin = PREFS.pinned.indexOf(t.id) >= 0 ? " \u2605" : "";
     return '<div class="optrow" tabindex="0" data-id="' + esc(t.id) + '"><span class="sl">' + (t.title || t.id) + pin + '</span><span class="small">' + t.id + '</span></div>';
   }).join("") : '<div class="srow" tabindex="0" data-key="none"><span class="sl">No hidden apps</span></div>';
+  html += '<div class="optrow" tabindex="0" data-key="close"><span class="sl">Close</span></div>';
   document.getElementById("optionsRows").innerHTML = html;
   document.getElementById("optionsPanel").querySelector(".panel-head").innerHTML = "Hidden apps <small>select to restore</small>";
   showOverlay("optionsPanel");
@@ -632,12 +634,14 @@ function activateRow(el){
   var id = el.getAttribute("data-id");
   if (mode === "settings") {
     if (key === "tvsettings") { hideOverlay(); launch(SETTINGS_TILE.id, null); return; }
+    if (key === "close") { hideOverlay(); return; }
     if (key === "manage") { openManage(); return; }
     if (key === "reset") { resetAll(); return; }
     if (key && findRow(key)) changeSetting(key, 1);
     return;
   }
   if (mode === "manage") {
+    if (key === "close") { hideOverlay(); return; }
     if (id) {
       var i = PREFS.hidden.indexOf(id);
       if (i >= 0) PREFS.hidden.splice(i, 1);
@@ -648,6 +652,7 @@ function activateRow(el){
   if (mode === "options") {
     var old = lastFocusEl;
     var label = el.querySelector(".sl") ? el.querySelector(".sl").textContent : "";
+    if (label === "Close") { hideOverlay(); return; }
     hideOverlay();
     if (id) {
       if (label === "Pin" || label === "Unpin") togglePin(id);

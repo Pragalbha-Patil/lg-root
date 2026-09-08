@@ -84,10 +84,12 @@ Preference changes persist to disk on the TV and survive relaunches:
 | **Sort order** | Most used / alphabetical / pinned-first ordering of the tile grid |
 | **Hidden apps** | Lists hidden apps; select one to restore it to the grid |
 | **Reset all** | Restores every preference to its default |
+| **Close panel** | Closes the settings panel (also closes the per-tile menu) |
 
 Use **Left/Right** on a row to cycle its value and **OK** to toggle; **Back** returns to the grid.
-The launcher never shows an exit prompt — Back is always consumed in-app (it collapses the open
-panel first, then does nothing on the grid).
+The launcher never shows an exit prompt: `appinfo.json` sets `disableBackHistoryAPI`, so the webview
+owns the Back key (it collapses the open panel first, then does nothing on the grid) instead of the
+TV's history-based exit dialog.
 
 ### Pinning, hiding and search
 

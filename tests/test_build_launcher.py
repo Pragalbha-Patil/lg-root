@@ -199,9 +199,18 @@ class QolTest(unittest.TestCase):
     def test_back_never_prompts_to_exit(self):
         out, _, _ = bl.build()
         html = out["launcher-app/index.html"]
+        appinfo = json.loads(out["launcher-app/appinfo.json"])
+        self.assertTrue(appinfo.get("disableBackHistoryAPI"))
         self.assertIn("if (BACK_KEYS[kc]) { e.preventDefault(); return; }", html)
         self.assertNotIn("want to exit", html)
         self.assertNotIn("are you sure", html)
+
+    def test_close_row_closes_panels(self):
+        out, _, _ = bl.build()
+        html = out["launcher-app/index.html"]
+        self.assertIn('key: "close", label: "Close panel"', html)
+        self.assertIn('if (key === "close") { hideOverlay(); return; }', html)
+        self.assertIn('"Close"', html)
 
 
 class UsageTest(unittest.TestCase):
