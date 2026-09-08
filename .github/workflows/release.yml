@@ -26,11 +26,13 @@ jobs:
       - name: Verify version and package checked outputs
         env:
           RELEASE_TAG: ${{ github.ref_name }}
-        run: python tools/package.py --tag "$RELEASE_TAG"
+        run: |
+          python tools/package.py --tag "$RELEASE_TAG"
+          test -f "docs/releases/$RELEASE_TAG.md"
       - uses: softprops/action-gh-release@6cbd405e2c4e67a21c47fa9e383d020e4e28b836 # v2.3.3
         with:
           files: |
             dist/minimal-home-*.tar.gz
             dist/minimal-home-*.tar.gz.sha256
           fail_on_unmatched_files: true
-          generate_release_notes: true
+          body_path: docs/releases/${{ github.ref_name }}.md

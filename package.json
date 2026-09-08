@@ -5,8 +5,8 @@
   "engines": { "node": "^22.22.2 || ^24.15.0 || >=26.0.0" },
   "scripts": {
     "lint": "eslint launcher-app/src launcher-service tests/js",
-    "test": "node --test --test-isolation=none tests/js/*.test.cjs",
-    "coverage": "c8 node --test --test-isolation=none tests/js/*.test.cjs",
+    "test": "node --test --experimental-test-isolation=none tests/js/*.test.cjs",
+    "coverage": "c8 node --test --experimental-test-isolation=none tests/js/*.test.cjs",
     "format": "prettier --write \"launcher-app/src/*.js\" \"launcher-app/src/*.css\" \"launcher-service/*.js\"",
     "format:check": "prettier --check \"launcher-app/src/*.js\" \"launcher-app/src/*.css\" \"launcher-service/*.js\""
   },

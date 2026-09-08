@@ -16,6 +16,8 @@ Complete the [contributor setup](../CONTRIBUTING.md#local-setup), including
    configured version. Inspect the archive and its SHA-256 sidecar in `dist/`.
 5. Record the TV models/firmware and device scenarios actually tested. Call out
    installation limitations and any unverified device behavior in release notes.
+   Write these notes to `docs/releases/vVERSION.md` and commit them before tagging;
+   the release workflow publishes that file as the release description.
 
 Packaging rejects a mismatched tag or stale generated output. Files come from
 an explicit allowlist in `tools/package.py`, excluding runtime state and private
@@ -27,7 +29,7 @@ toolchain. The SHA-256 sidecar records the resulting archive digest.
 
 After review, create and push the corresponding `vVERSION` tag. The release
 workflow first runs the shared CI workflow, then packages the checked source
-and publishes the archive and checksum with generated release notes.
+and publishes the archive and checksum with the reviewed versioned release notes.
 
 The publish job has repository write permission; validation uses read-only
 permissions. Workflow commands read the tag through an environment variable.

@@ -425,7 +425,7 @@
       art.appendChild(mkInitialEl(t.title));
     }
     d.appendChild(art);
-    var s = document.createElement("span");
+    var s = document.createElement("div");
     s.className = "label";
     s.textContent = t.title || t.id;
     d.appendChild(s);
@@ -668,7 +668,7 @@
         html.push(
           '<div class="srow" tabindex="0" data-key="accent"><span class="sl">' +
             r.label +
-            '</span><span class="val">' +
+            '</span><span class="val dots">' +
             dots +
             "</span></div>"
         );
@@ -1288,6 +1288,10 @@
   var tries = 0,
     refreshRetry = null,
     refreshing = false;
+  function isBackground() {
+    // webOS 10.3.1 can report hidden for a focused foreground webview.
+    return document.hidden && !document.hasFocus();
+  }
   function applyHeader(h) {
     if (!h) return;
     if (h.text) {
@@ -1301,7 +1305,7 @@
     }
   }
   function refresh() {
-    if (refreshing || document.hidden) return;
+    if (refreshing || isBackground()) return;
     clearTimeout(refreshRetry);
     refreshRetry = null;
     refreshing = true;
@@ -1349,7 +1353,7 @@
   loadPrefs();
   restoreFocus();
   document.addEventListener("visibilitychange", function () {
-    if (!document.hidden) {
+    if (!isBackground()) {
       tries = 0;
       requestRefresh();
       loadPrefs();
@@ -1374,7 +1378,7 @@
   });
   // System stats polling (every 5s)
   function updateSystemStats() {
-    if (!document.hidden && PREFS.showSystemStats)
+    if (!isBackground() && PREFS.showSystemStats)
       svcCall(
         SVC,
         SVC_STATS_M,

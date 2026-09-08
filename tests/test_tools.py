@@ -151,7 +151,13 @@ class InstallerTest(unittest.TestCase):
                         MH_RESPONSE='{"returnValue":true}', MH_SSH_EXIT="0", MH_SCP_EXIT="0")
         self.env.pop("APP_ID", None)
         self.env.pop("SVC_ID", None)
-        self.env["PATH"] = os.pathsep.join((str(self.bin), str(Path(SHELL).parent), self.env["PATH"]))
+        # Windows runners may use 'Path': duplicate case variants can cause the
+        # child process to select the real SSH binary instead of our stubs.
+        inherited_path = os.environ.get("PATH", "")
+        for key in list(self.env):
+            if key.upper() == "PATH":
+                del self.env[key]
+        self.env["PATH"] = os.pathsep.join((str(self.bin), str(Path(SHELL).parent), inherited_path))
         self.stub("ssh", 'printf "ssh\\n" >> "$MH_CALL_LOG"\nprintf "%s\\n" "$@" >> "$MH_CALL_LOG"\n'
                   'if [ "$MH_SSH_EXIT" != 0 ]; then exit "$MH_SSH_EXIT"; fi\n'
                   'case "$*" in *luna-send*) printf "%s\\n" "$MH_RESPONSE";; esac\n')

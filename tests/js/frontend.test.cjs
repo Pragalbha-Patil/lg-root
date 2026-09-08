@@ -99,6 +99,8 @@ test('tile icons fall back to initials and all app-provided menu/search text is 
 
 test('settings cycle choices, toggles and accents; save errors are visible; action rows ignore arrows', t => {
     const app = appFor(t); ready(app); app.click('#settingsBtn');
+    assert.equal(app.window.getComputedStyle(app.document.querySelector('#grid .label')).display, 'block');
+    assert.equal(app.window.getComputedStyle(row(app, 'accent').querySelector('.val')).display, 'flex');
     for (const key of ['accent', 'tileSize', 'labels', 'showSystemStats', 'dateFormat', 'sort']) {
         row(app, key).focus(); app.key(39); save(app); app.key(37); save(app);
     }
@@ -210,6 +212,16 @@ test('blur/background cancels held keys and skips stats polling; foreground relo
     assert.equal(app.calls.filter(c => c.method === 'getSystemStats').length, 0);
     app.visible(true); app.prefs({ showSystemStats: false }); app.tiles();
     await app.clock.run(5000); assert.equal(app.calls.filter(c => c.method === 'getSystemStats').length, 0);
+});
+
+test('webOS foreground focus overrides a stale hidden state for tiles and stats', async t => {
+    const app = appFor(t, { hidden: true, focused: true });
+    ready(app);
+    assert.deepEqual(ids(app, 'grid'), ['video']);
+    await app.clock.run(1000);
+    assert.equal(app.calls.filter(c => c.method === 'getSystemStats').length, 1);
+    app.visible(false);
+    assert.equal(app.calls.filter(c => c.method === 'getPrefs').length, 2);
 });
 
 test('stats render numbers and unknowns, and header updates use text rather than HTML', async t => {

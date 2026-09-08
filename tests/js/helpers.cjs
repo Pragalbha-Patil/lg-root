@@ -125,8 +125,9 @@ function browser(options = {}) {
     const clock = timers(), calls = [];
     Object.assign(window, clock);
     window.HTMLElement.prototype.scrollIntoView = function () {};
-    let hidden = false;
+    let hidden = options.hidden || false;
     Object.defineProperty(document, 'hidden', { get: () => hidden });
+    document.hasFocus = () => options.focused ?? !hidden;
     window.MH_CONFIG = { version: 'test', system: [constants.SETTINGS_ID], settingsTile: { id: constants.SETTINGS_ID, title: 'Settings' } };
     if (options.settings === false) window.MH_CONFIG.settingsTile = null;
     if (!options.bridgeOnly && !options.offline) {

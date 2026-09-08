@@ -68,6 +68,8 @@ when modifying conditional logic.
 state for each test. The full suite runs without test-process isolation so host
 sandbox process restrictions do not prevent coverage collection. Individual
 scripts and DOMs still get fresh environments and are cleaned up after each test.
+The runner uses `--experimental-test-isolation=none`, the spelling supported by
+both Node 22 and 24; the unprefixed flag is unavailable on Node 22.
 
 No local test contacts a TV. Desktop tests cannot verify Luna authorization,
 service jailing, the TV's browser/Node compatibility, real input switching,

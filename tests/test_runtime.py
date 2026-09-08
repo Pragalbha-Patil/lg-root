@@ -12,5 +12,5 @@ class RuntimeTests(unittest.TestCase):
         self.assertIsNotNone(shutil.which("node"), "Node.js is required")
         self.assertTrue((root / "node_modules/jsdom").is_dir(), "Run npm ci for host test dependencies")
         tests = sorted(str(path) for path in (root / "tests/js").glob("*.test.cjs"))
-        subprocess.run(["node", "node_modules/c8/bin/c8.js", "node", "--test", "--test-isolation=none", *tests],
+        subprocess.run(["node", "node_modules/c8/bin/c8.js", "node", "--test", "--experimental-test-isolation=none", *tests],
                        cwd=root, check=True, timeout=120)

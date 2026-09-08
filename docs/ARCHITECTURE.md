@@ -73,6 +73,9 @@ These constraints come from project device observations, including webOS
   The generated service-local config is intentional.
 - Background webviews can be purged after a short delay. Refresh on foreground
   return; do not assume in-memory state survived another app.
+- On webOS 10.3.1, a focused foreground webview can still report
+  `document.hidden === true`. Background work checks also use `document.hasFocus()`
+  so this stale visibility flag does not prevent live tiles or statistics.
 - `disableBackHistoryAPI: true` lets the app handle Back rather than delegating
   it to a platform exit/history dialog.
 - Input tiles come from launch points and bookmark metadata. Preserve
