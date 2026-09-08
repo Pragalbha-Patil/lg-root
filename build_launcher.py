@@ -437,6 +437,7 @@ function mkInitialEl(title){
 }
 
 var SETTING_ROWS = [
+  { key: "tvsettings", label: "TV settings", type: "action", fmt: function(){ return "open"; } },
   { key: "accent", label: "Accent color", type: "accent" },
   { key: "tileSize", label: "Tile size", type: "choice", opts: ["compact", "standard", "large"],
     fmt: function(v){ return v.charAt(0).toUpperCase() + v.slice(1); } },
@@ -630,6 +631,7 @@ function activateRow(el){
   var key = el.getAttribute("data-key");
   var id = el.getAttribute("data-id");
   if (mode === "settings") {
+    if (key === "tvsettings") { hideOverlay(); launch(SETTINGS_TILE.id, null); return; }
     if (key === "manage") { openManage(); return; }
     if (key === "reset") { resetAll(); return; }
     if (key && findRow(key)) changeSetting(key, 1);
@@ -807,7 +809,10 @@ document.addEventListener("keydown", function(e){
   if (kc === 457 || kc === 412) { e.preventDefault(); openOptionsKey(); return; }
   var dir = dirOf(kc);
   if (dir) { e.preventDefault(); moveTile(dir); startHold(dir); return; }
-  if (BACK_KEYS[kc]) return;
+  // Swallow Back everywhere on the grid: an unhandled back is what makes
+  // WAM surface its "exit app?" dialog; this launcher is a home replacement
+  // and never prompts to exit.
+  if (BACK_KEYS[kc]) { e.preventDefault(); return; }
   if (e.key && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
     e.preventDefault();
     openSearch(e.key.toLowerCase());

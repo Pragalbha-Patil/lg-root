@@ -76,6 +76,7 @@ Preference changes persist to disk on the TV and survive relaunches:
 
 | Row | What it does |
 | --- | --- |
+| **TV settings** | Opens the TV's actual system-settings layout (exits the launcher panel) |
 | **Accent color** | Cycles the highlight color (steel / emerald / violet / amber / crimson) with Left/Right |
 | **Tile size** | Compact / standard / large grid density |
 | **App labels** | Shows or hides the text under each icon |
@@ -85,6 +86,8 @@ Preference changes persist to disk on the TV and survive relaunches:
 | **Reset all** | Restores every preference to its default |
 
 Use **Left/Right** on a row to cycle its value and **OK** to toggle; **Back** returns to the grid.
+The launcher never shows an exit prompt — Back is always consumed in-app (it collapses the open
+panel first, then does nothing on the grid).
 
 ### Pinning, hiding and search
 

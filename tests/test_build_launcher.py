@@ -189,6 +189,20 @@ class QolTest(unittest.TestCase):
         self.assertIn("PREFS.accent", html)
         self.assertIn("PREFS.sort", html)
 
+    def test_tv_settings_row_opens_real_settings(self):
+        out, _, _ = bl.build()
+        html = out["launcher-app/index.html"]
+        self.assertIn('key: "tvsettings", label: "TV settings"', html)
+        self.assertIn('if (key === "tvsettings")', html)
+        self.assertIn("launch(SETTINGS_TILE.id, null)", html)
+
+    def test_back_never_prompts_to_exit(self):
+        out, _, _ = bl.build()
+        html = out["launcher-app/index.html"]
+        self.assertIn("if (BACK_KEYS[kc]) { e.preventDefault(); return; }", html)
+        self.assertNotIn("want to exit", html)
+        self.assertNotIn("are you sure", html)
+
 
 class UsageTest(unittest.TestCase):
     def test_usage_reads_service_path_first(self):
