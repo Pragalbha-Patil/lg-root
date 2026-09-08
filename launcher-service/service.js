@@ -299,4 +299,19 @@ service.register('setPrefs', function (msg) {
     }
 });
 
+service.register('getSystemStats', function (msg) {
+    try {
+        var stats = { cpu: 0, ram: 0, temp: null };
+        try {
+            var raw = fs.readFileSync('/tmp/minhome-stats.json', 'utf8');
+            stats = JSON.parse(raw);
+        } catch (e) {}
+        log({ m: 'getSystemStats', cpu: stats.cpu, ram: stats.ram, temp: stats.temp });
+        msg.respond({ returnValue: true, cpu: stats.cpu, ram: stats.ram, temp: stats.temp });
+    } catch (e) {
+        log({ m: 'getSystemStats', err: String((e && e.message) || e) });
+        msg.respond({ returnValue: false, errorText: String((e && e.message) || e) });
+    }
+});
+
 log({ m: 'service-start', err: '' });

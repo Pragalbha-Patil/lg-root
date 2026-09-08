@@ -167,6 +167,11 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
 h1{font-size:34px;font-weight:200;letter-spacing:3px;color:#e8ecf1}
 h1 b{font-weight:700}
 .hright{display:flex;align-items:center;gap:28px}
+#sysStats{display:flex;align-items:center;gap:20px;padding:0 18px;height:64px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:999px;font-size:17px;color:#c3ccd8;white-space:nowrap}
+#sysStats .stat{display:flex;align-items:center;gap:8px}
+#sysStats .stat .label{color:#6b7686;font-size:14px}
+#sysStats .stat .value{font-weight:600;color:#e8ecf1}
+#sysStats .sep{width:1px;height:28px;background:rgba(255,255,255,.12)}
 #settingsBtn{display:flex;align-items:center;gap:11px;background:rgba(255,255,255,.08);border:3px solid transparent;border-radius:999px;color:#d8dee7;font-size:19px;padding:11px 26px 11px 20px;cursor:pointer;transition:transform .13s,background .13s,border-color .13s}
 #settingsBtn .gear{font-size:22px}
 #settingsBtn:focus{outline:none;background:rgba(255,255,255,.15);border-color:var(--accent);box-shadow:0 10px 30px rgba(0,0,0,.5);color:#fff}
@@ -213,6 +218,7 @@ h1 b{font-weight:700}
 <header>
 <h1 id="headLine"><span id="headText">__WELCOME_TEXT__</span> <b id="headBrand">__WELCOME_BRAND__</b></h1>
 <div class="hright">
+<div id="sysStats" aria-hidden="true"><div class="stat"><span class="label">CPU</span><span class="value" id="statCpu">--%</span></div><div class="sep"></div><div class="stat"><span class="label">RAM</span><span class="value" id="statRam">--%</span></div><div class="sep"></div><div class="stat"><span class="label">Temp</span><span class="value" id="statTemp">--&deg;C</span></div></div>
 <div id="settingsBtn" class="tile" tabindex="0" role="button" aria-label="Settings"><span class="gear">&#9881;</span><span>Settings</span></div>
 <div id="clock">--:--<small></small></div>
 </div>
@@ -302,6 +308,7 @@ var SELF_ID = "org.minimal.home";
 var SVC_PREFS_GET_M = "getPrefs";
 var SVC_PREFS_SET_M = "setPrefs";
 var SVC_LGHOME_M = "openLGHome";
+var SVC_STATS_M = "getSystemStats";
 
 var __mhTiles = []; window.__mhTiles = __mhTiles;
 var PREFS = { accent: "steel", tileSize: "standard", labels: true, clock24: false, sort: "mru", pinned: [], hidden: [] };
@@ -897,6 +904,22 @@ document.addEventListener("visibilitychange", function(){
   if (!document.hidden) { tries = 0; requestRefresh(); }
 });
 window.addEventListener("focus", function(){ tries = 0; requestRefresh(); });
+  // System stats polling (every 5s)
+  var SVC_STATS_M = 'getSystemStats';
+  function updateSystemStats(){
+    svcCall(SVC, SVC_STATS_M, {}, function(d){
+      if (d && d.returnValue) {
+        var cpu = document.getElementById('statCpu');
+        var ram = document.getElementById('statRam');
+        var temp = document.getElementById('statTemp');
+        if (cpu) cpu.textContent = (typeof d.cpu === 'number' ? d.cpu : '--') + '%';
+        if (ram) ram.textContent = (typeof d.ram === 'number' ? d.ram : '--') + '%';
+        if (temp) temp.textContent = (typeof d.temp === 'number' ? d.temp + '\u00b0C' : '--\u00b0C');
+      }
+    }, function(){});
+    setTimeout(updateSystemStats, 5000);
+  }
+  setTimeout(updateSystemStats, 1000);
 })();
 </script>
 </body>

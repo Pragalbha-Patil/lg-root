@@ -11,6 +11,7 @@ const { BYPASS_FILE, WATCH_LOG: LOG, HOME_ID, SELF_ID, APP_DIR, SETTINGS_ID, SET
 const ICON_DIR = path.join(APP_DIR, 'icons');
 const ICON_MAX_BYTES = 300000;
 const FIRSTUSE = '/var/luna/preferences/ran-firstuse';
+const STATS_FILE = '/tmp/minhome-stats.json';
 
 let fails = 0;
 let lastRedirect = 0;
@@ -95,11 +96,54 @@ function provisionSettingsIcon() {
     } catch (e) { log({ provErr: 'settings:' + String((e && e.code) || e) }); }
 }
 
+function collectSystemStats() {
+    try {
+        // CPU
+        var cpuUsage = 0;
+        var stat = fs.readFileSync('/proc/stat', 'utf8');
+        var m = stat.match(/^cpu\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)/);
+        if (m) {
+            var user = parseInt(m[1], 10), nice = parseInt(m[2], 10);
+            var sys = parseInt(m[3], 10), idle = parseInt(m[4], 10);
+            var total = user + nice + sys + idle;
+            if (typeof lastCpuTotal === 'number' && total > lastCpuTotal) {
+                var diffTotal = total - lastCpuTotal;
+                var diffIdle = idle - (lastCpuIdle || 0);
+                cpuUsage = Math.max(0, Math.min(100, Math.round(100 * (diffTotal - diffIdle) / diffTotal)));
+            }
+            lastCpuTotal = total;
+            lastCpuIdle = idle;
+        }
+        // RAM
+        var ramUsage = 0;
+        var mem = fs.readFileSync('/proc/meminfo', 'utf8');
+        var total = parseInt((mem.match(/MemTotal:\s+(\d+)/) || [])[1] || '0', 10);
+        var avail = parseInt((mem.match(/MemAvailable:\s+(\d+)/) || [])[1] || '0', 10);
+        if (total > 0) ramUsage = Math.round(100 * (total - avail) / total);
+        // Temp
+        var tempC = null;
+        var zones = fs.readdirSync('/sys/class/thermal');
+        for (var i = 0; i < zones.length; i++) {
+            var tz = zones[i];
+            if (/^thermal_zone\d+$/.test(tz)) {
+                var t = fs.readFileSync('/sys/class/thermal/' + tz + '/temp', 'utf8').trim();
+                var tc = parseInt(t, 10);
+                if (!isNaN(tc)) { tempC = Math.round(tc / 1000); break; }
+            }
+        }
+        fs.writeFileSync(STATS_FILE, JSON.stringify({ cpu: cpuUsage, ram: ramUsage, temp: tempC }));
+    } catch (e) { log({ statsErr: String((e && e.message) || e) }); }
+}
+
+var lastCpuTotal = null;
+var lastCpuIdle = null;
+
 async function runProvision() {
     try {
         const lps = await listLaunchPoints();
         provisionIcons(lps);
         provisionSettingsIcon();
+        collectSystemStats();
     } catch (e) { log({ provErr: String((e && e.message) || e) }); }
 }
 
@@ -214,5 +258,9 @@ function watch() {
 
 setTimeout(runProvision, 15000);
 setInterval(runProvision, 5 * 60 * 1000);
+
+// System stats collection every 5s (watcher runs as root, can read /sys/class/thermal)
+collectSystemStats();
+setInterval(collectSystemStats, 5000);
 
 watch();
