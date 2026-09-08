@@ -10,18 +10,24 @@ Minimal Home is a launcher for rooted LG webOS TVs. Read
 Run from the repository root:
 
 ```sh
+npm ci --ignore-scripts
+npm run format
 python build_launcher.py
 python tools/check.py
 ```
 
-The check command is also used in CI. Node.js is required. It never contacts a
+The check command is also used in CI. See [testing](docs/TESTING.md) for Node
+requirements and coverage gates. npm packages are host-only. It never contacts a
 TV. Shell checks require POSIX sh; Linux CI uses `--require-shell`.
 Use `python tools/package.py` to prepare a local release archive.
 
 ## Source ownership
 
-- UI HTML, CSS, and JavaScript live in `build_launcher.py`.
-  Regenerate and commit `launcher-app/index.html`; never patch it directly.
+- UI HTML, CSS, and JavaScript live in `launcher-app/src/`; `build_launcher.py`
+  assembles the page. Regenerate and commit `launcher-app/index.html`; never patch it directly.
+- Shared preferences, validation, launch parameters, and sorting live in
+  `launcher-service/model.js`, also embedded in the page. Rebuild after changing it.
+- Shared filesystem helpers belong in `storage.js`; Luna stream framing in `json-stream.js`.
 - `launcher-app/config.json` is the config/version source. The generator writes
   `launcher-service/config.json` and stamps `launcher-app/appinfo.json`.
 - Relay behavior lives in `launcher-service/service.js`.
@@ -34,7 +40,8 @@ Use `python tools/package.py` to prepare a local release archive.
 
 - Keep the frontend and relay in their existing ES5 style. The watcher already
   uses modern Node features; do not assume its runtime matches the local Node.
-- Use the Python standard library for host tooling; keep imports free of side effects.
+- Use the Python standard library for Python tooling; keep imports free of side effects.
+  Keep npm development packages out of TV release payloads.
 - Discover inputs from live launch points. Preserve per-port launch parameters,
   but never allow a bookmark's `params.id` to overwrite the target app ID.
 - Keep icons app-relative: the file webview cannot load arbitrary absolute paths.
@@ -49,7 +56,9 @@ Use `python tools/package.py` to prepare a local release archive.
 
 Inspect the existing diff before editing. Keep changes focused and leave unrelated
 user work intact. Add behavior-level regressions for bug fixes; do not replace
-device quirks without evidence. Run the shared check command after changes.
+device quirks without evidence. Runtime tests live in `tests/js/` and exercise
+complete scripts with isolated DOM/platform mocks. Preserve per-file coverage gates;
+do not add exclusions to meet them. Run the shared check command after changes.
 
 Local development does not imply deployment: do not contact a TV, install boot
 hooks, restart services, publish releases, or push changes unless the task

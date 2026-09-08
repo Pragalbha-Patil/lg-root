@@ -5,6 +5,9 @@ IPK packages or first-install automation.
 
 ## Prepare
 
+Complete the [contributor setup](../CONTRIBUTING.md#local-setup), including
+`npm ci --ignore-scripts`, before running checks.
+
 1. Update `version` in `launcher-app/config.json` using `MAJOR.MINOR.PATCH`.
 2. Run `python build_launcher.py` and commit the source and generated outputs
    together. Do not use `--version` as a substitute for the source version.

@@ -88,7 +88,7 @@ class BuildInputsTest(unittest.TestCase):
         output, _, _ = bl.build("2.3.4")
         self.assertEqual(json.loads(output["launcher-app/appinfo.json"])["version"], "2.3.4")
         self.assertEqual(json.loads(output["launcher-service/config.json"])["version"], "2.3.4")
-        self.assertIn('var BUILD = "v2.3.4"', output["launcher-app/index.html"])
+        self.assertIn('"version": "v2.3.4"', output["launcher-app/index.html"])
         with self.assertRaises(ValueError):
             bl.build('1.0.0";bad')
 

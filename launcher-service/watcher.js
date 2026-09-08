@@ -2,16 +2,23 @@
 // Minimal Home redirect watcher (EVENT-DRIVEN v2).
 // Subscribes to foreground-app changes; when LG Home comes up, opens
 // Minimal Home instead (unless bypassed via the LG Home tile).
-// No polling: zero CPU when idle, reacts instantly.
+// Home detection is event-driven; icons and statistics refresh periodically.
 const { execFile, spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const { BYPASS_FILE, WATCH_LOG: LOG, HOME_ID, SELF_ID, APP_DIR, SETTINGS_ID, SETTINGS_ICON } = require('./constants');
+const C = require('./constants');
+const { BYPASS_FILE, HOME_ID, SELF_ID, APP_DIR, SETTINGS_ID, SETTINGS_ICON } =
+    C;
+const M = require('./model');
+const store = require('./storage')(fs);
+const createJsonStream = require('./json-stream');
+const { StringDecoder } = require('string_decoder');
+const log = store.logger(C.WATCH_LOG, C.LOG_MAX_BYTES);
 
 const ICON_DIR = path.join(APP_DIR, 'icons');
 const ICON_MAX_BYTES = 300000;
-const FIRSTUSE = '/var/luna/preferences/ran-firstuse';
-const STATS_FILE = '/tmp/minhome-stats.json';
+const FIRSTUSE = C.FIRSTUSE_FILE;
+const STATS_FILE = C.STATS_FILE;
 
 let fails = 0;
 let lastRedirect = 0;
@@ -19,81 +26,109 @@ let foregroundApp = null;
 let retryTimer = null;
 let redirecting = false;
 
-function log(o) {
-    try {
-        const line = new Date().toISOString() + ' ' + JSON.stringify(o) + '\n';
-        fs.appendFileSync(LOG, line);
-        try {
-            if (fs.statSync(LOG).size > 100000) fs.writeFileSync(LOG, line);
-        } catch (e) {}
-    } catch (e) {}
-}
-
 function lunaLaunch(id) {
     return new Promise((resolve) => {
-        execFile('luna-send', ['-n', '1', 'luna://com.webos.applicationManager/launch',
-            JSON.stringify({ id })], { timeout: 15000 }, (err, stdout) => {
+        execFile(
+            'luna-send',
+            [
+                '-n',
+                '1',
+                'luna://com.webos.applicationManager/launch',
+                JSON.stringify({ id })
+            ],
+            { timeout: 15000 },
+            (err, stdout) => {
                 if (err) return resolve(null);
-                try { resolve(JSON.parse(stdout)); } catch (e) { resolve(null); }
-            });
+                try {
+                    resolve(JSON.parse(stdout));
+                } catch (e) {
+                    resolve(null);
+                }
+            }
+        );
     });
 }
 
 function listLaunchPoints() {
     return new Promise((resolve) => {
-        execFile('luna-send', ['-n', '1', 'luna://com.webos.applicationManager/listLaunchPoints', '{}'],
-            { timeout: 20000 }, (err, stdout) => {
+        execFile(
+            'luna-send',
+            [
+                '-n',
+                '1',
+                'luna://com.webos.applicationManager/listLaunchPoints',
+                '{}'
+            ],
+            { timeout: 20000 },
+            (err, stdout) => {
                 if (err) return resolve([]);
                 try {
                     const p = JSON.parse(stdout);
-                    resolve((p && p.launchPoints) || []);
-                } catch (e) { resolve([]); }
-            });
+                    resolve(
+                        p &&
+                            p.returnValue === true &&
+                            Array.isArray(p.launchPoints)
+                            ? p.launchPoints
+                            : []
+                    );
+                } catch (e) {
+                    resolve([]);
+                }
+            }
+        );
     });
 }
 
-function provisionIcons(lps) {
-    let ok = 0, total = 0;
-    try { fs.mkdirSync(ICON_DIR, { recursive: true }); } catch (e) {}
-    (lps || []).forEach((lp) => {
-        if (!lp || !lp.id) return;
-        const dst = path.join(ICON_DIR, lp.id.replace(/[\/\\]/g, '_') + '.png');
-        const src = lp.largeIcon || lp.icon || '';
+function copyIcon(source, destination) {
+    if (typeof source !== 'string' || !source) return false;
+    const size = fs.statSync(source).size;
+    if (size === 0 || size > ICON_MAX_BYTES) return false;
+    const bytes = fs.readFileSync(source);
+    try {
+        if (fs.readFileSync(destination).equals(bytes)) return true;
+    } catch (error) {
+        /* First copy or a previously unreadable destination. */
+    }
+    fs.writeFileSync(destination, bytes);
+    return true;
+}
+
+function provisionIcons(points) {
+    let copied = 0,
+        total = 0;
+    try {
+        fs.mkdirSync(ICON_DIR, { recursive: true });
+    } catch (error) {
+        log({ iconDirectory: String(error) });
+    }
+    (points || []).forEach((point) => {
+        if (!point || !M.validId(point.id)) return;
+        const destination = path.join(ICON_DIR, point.id + '.png');
         total++;
         let good = false;
-        if (src) {
-            try {
-                const b = fs.readFileSync(src);
-                if (b.length && b.length <= ICON_MAX_BYTES) {
-                    try {
-                        if (fs.readFileSync(dst).equals(b)) {
-                            good = true; // unchanged: skip the flash write
-                        } else {
-                            fs.writeFileSync(dst, b);
-                            good = true;
-                        }
-                    } catch (e) {
-                        fs.writeFileSync(dst, b);
-                        good = true;
-                    }
-                }
-            } catch (e) { good = false; }
+        try {
+            good = copyIcon(point.largeIcon || point.icon, destination);
+        } catch (error) {
+            log({ iconCopy: String(error) });
         }
-        if (good) ok++;
-        else { try { fs.unlinkSync(dst); } catch (e) {} }
+        if (good) copied++;
+        else {
+            try {
+                fs.unlinkSync(destination);
+            } catch (error) {
+                log({ iconCleanup: String(error) });
+            }
+        }
     });
-    log({ m: 'icon-prov', total, ok });
+    log({ method: 'icon-provision', total, copied });
 }
 
 function provisionSettingsIcon() {
     try {
-        const dst = path.join(ICON_DIR, SETTINGS_ID + '.png');
-        const b = fs.readFileSync(SETTINGS_ICON);
-        if (b.length && b.length <= ICON_MAX_BYTES) {
-            try { if (fs.readFileSync(dst).equals(b)) return; } catch (e) {}
-            fs.writeFileSync(dst, b);
-        }
-    } catch (e) { log({ provErr: 'settings:' + String((e && e.code) || e) }); }
+        copyIcon(SETTINGS_ICON, path.join(ICON_DIR, SETTINGS_ID + '.png'));
+    } catch (error) {
+        log({ settingsIcon: String(error) });
+    }
 }
 
 var lastCpuTotal = null;
@@ -103,10 +138,14 @@ function collectSystemStats() {
     try {
         var showStats = true;
         try {
-            var prefs = JSON.parse(fs.readFileSync('/media/developer/apps/usr/palm/services/org.minimal.home.service/prefs.json', 'utf8'));
+            var prefs = JSON.parse(fs.readFileSync(C.PREFS_FILE, 'utf8'));
             showStats = prefs.showSystemStats !== false;
         } catch (e) {}
-        if (!showStats) { return; }
+        if (!showStats) {
+            lastCpuTotal = null;
+            lastCpuIdle = null;
+            return;
+        }
 
         // CPU
         var cpuUsage = null;
@@ -117,25 +156,50 @@ function collectSystemStats() {
                 // Guest time is already included in user/nice; count only the first eight fields.
                 var fields = m[1].trim().split(/\s+/).slice(0, 8).map(Number);
                 var idle = fields[3] + (fields[4] || 0);
-                var total = fields.reduce(function(sum, value) { return sum + value; }, 0);
+                var total = fields.reduce(function (sum, value) {
+                    return sum + value;
+                }, 0);
                 if (typeof lastCpuTotal === 'number' && total > lastCpuTotal) {
                     var diffTotal = total - lastCpuTotal;
                     var diffIdle = idle - (lastCpuIdle || 0);
-                    cpuUsage = Math.max(0, Math.min(100, Math.round(100 * (diffTotal - diffIdle) / diffTotal)));
+                    cpuUsage = Math.max(
+                        0,
+                        Math.min(
+                            100,
+                            Math.round(
+                                (100 * (diffTotal - diffIdle)) / diffTotal
+                            )
+                        )
+                    );
                 }
                 lastCpuTotal = total;
                 lastCpuIdle = idle;
             }
-        } catch (e) { log({ cpuErr: String((e && e.message) || e) }); }
+        } catch (e) {
+            log({ cpuErr: String((e && e.message) || e) });
+        }
 
         // RAM
         var ramUsage = null;
         try {
             var mem = fs.readFileSync('/proc/meminfo', 'utf8');
-            var total = parseInt((mem.match(/MemTotal:\s+(\d+)/) || [])[1] || '0', 10);
-            var avail = parseInt((mem.match(/MemAvailable:\s+(\d+)/) || [])[1] || '0', 10);
-            if (total > 0) ramUsage = Math.round(100 * (total - avail) / total);
-        } catch (e) { log({ ramErr: String((e && e.message) || e) }); }
+            var memoryTotal = parseInt(
+                (mem.match(/MemTotal:\s+(\d+)/) || [])[1] || '0',
+                10
+            );
+            var avail = parseInt(
+                (mem.match(/MemAvailable:\s+(\d+)/) || [])[1] || '0',
+                10
+            );
+            if (memoryTotal > 0 && /MemAvailable:/.test(mem))
+                ramUsage = M.metric(
+                    Math.round((100 * (memoryTotal - avail)) / memoryTotal),
+                    0,
+                    100
+                );
+        } catch (e) {
+            log({ ramErr: String((e && e.message) || e) });
+        }
 
         // Temp
         var tempC = null;
@@ -144,16 +208,35 @@ function collectSystemStats() {
             for (var i = 0; i < zones.length; i++) {
                 var tz = zones[i];
                 if (/^thermal_zone\d+$/.test(tz)) {
-                    var t = fs.readFileSync('/sys/class/thermal/' + tz + '/temp', 'utf8').trim();
+                    var t;
+                    try {
+                        t = fs
+                            .readFileSync(
+                                '/sys/class/thermal/' + tz + '/temp',
+                                'utf8'
+                            )
+                            .trim();
+                    } catch (error) {
+                        continue;
+                    }
                     var tc = parseInt(t, 10);
-                    if (!isNaN(tc)) { tempC = Math.round(tc / 1000); break; }
+                    tempC = M.metric(Math.round(tc / 1000), -100, 200);
+                    if (tempC !== null) break;
                 }
             }
-        } catch (e) { log({ tempErr: String((e && e.message) || e) }); }
+        } catch (e) {
+            log({ tempErr: String((e && e.message) || e) });
+        }
 
-        fs.writeFileSync(STATS_FILE + '.tmp', JSON.stringify({ cpu: cpuUsage, ram: ramUsage, temp: tempC, timestamp: Date.now() }));
-        fs.renameSync(STATS_FILE + '.tmp', STATS_FILE);
-    } catch (e) { log({ statsErr: String((e && e.message) || e) }); }
+        store.writeJson(STATS_FILE, {
+            cpu: M.metric(cpuUsage, 0, 100),
+            ram: ramUsage,
+            temp: tempC,
+            timestamp: Date.now()
+        });
+    } catch (e) {
+        log({ statsErr: String((e && e.message) || e) });
+    }
 }
 
 async function runProvision() {
@@ -162,32 +245,44 @@ async function runProvision() {
         provisionIcons(lps);
         provisionSettingsIcon();
         collectSystemStats();
-    } catch (e) { log({ provErr: String((e && e.message) || e) }); }
+    } catch (e) {
+        log({ provErr: String((e && e.message) || e) });
+    }
 }
 
 async function redirectLoop() {
     if (foregroundApp !== HOME_ID || redirecting) return;
     try {
-        if (fs.existsSync(BYPASS_FILE) &&
-            Date.now() < parseInt(fs.readFileSync(BYPASS_FILE, 'utf8'), 10)) return;
-        if (Date.now() - lastRedirect < 8000) return;
+        if (
+            fs.existsSync(BYPASS_FILE) &&
+            Date.now() < parseInt(fs.readFileSync(BYPASS_FILE, 'utf8'), 10)
+        )
+            return;
+        if (Date.now() - lastRedirect < 8000) {
+            scheduleRetry(8000 - (Date.now() - lastRedirect));
+            return;
+        }
         redirecting = true;
         const r = await lunaLaunch(SELF_ID);
         if (r && r.returnValue) {
-            fails = 0; lastRedirect = Date.now();
+            fails = 0;
+            lastRedirect = Date.now();
             log({ redirect: true });
         } else {
             if (foregroundApp !== HOME_ID) return;
             fails++;
-            const backoff = fails < 5 ? 2000 : Math.min(5 * 60 * 1000, 30000 * Math.pow(2, fails - 5));
+            const backoff =
+                fails < 5
+                    ? 2000
+                    : Math.min(5 * 60 * 1000, 30000 * Math.pow(2, fails - 5));
             log({ redirectFail: true, fails, retryInMs: backoff });
-            retryTimer = setTimeout(() => {
-                retryTimer = null;
-                redirectLoop();
-            }, backoff);
+            scheduleRetry(backoff);
         }
-    } catch (e) { log({ tickErr: String((e && e.message) || e) }); }
-    finally { redirecting = false; }
+    } catch (e) {
+        log({ tickErr: String((e && e.message) || e) });
+    } finally {
+        redirecting = false;
+    }
 }
 
 async function onForeground(appId) {
@@ -197,67 +292,58 @@ async function onForeground(appId) {
         retryTimer = null;
     }
     try {
-        if (!appId || appId !== HOME_ID) { if (appId !== HOME_ID) fails = 0; return; }
+        if (!appId || appId !== HOME_ID) {
+            if (appId !== HOME_ID) fails = 0;
+            return;
+        }
         if (!fs.existsSync(FIRSTUSE)) return;
         try {
             if (fs.existsSync(BYPASS_FILE)) {
                 const exp = parseInt(fs.readFileSync(BYPASS_FILE, 'utf8'), 10);
-                if (Date.now() < exp) { fails = 0; return; }
-                try { fs.unlinkSync(BYPASS_FILE); } catch (e) {}
+                if (Date.now() < exp) {
+                    fails = 0;
+                    return;
+                }
+                try {
+                    fs.unlinkSync(BYPASS_FILE);
+                } catch (e) {}
             }
         } catch (e) {}
         if (retryTimer === null) redirectLoop();
-    } catch (e) { log({ tickErr: String((e && e.message) || e) }); }
+    } catch (e) {
+        log({ tickErr: String((e && e.message) || e) });
+    }
+}
+
+function scheduleRetry(delay) {
+    if (retryTimer !== null) clearTimeout(retryTimer);
+    retryTimer = setTimeout(() => {
+        retryTimer = null;
+        redirectLoop();
+    }, delay);
 }
 
 function watch() {
     log({ watcherStart: true });
     let child;
     try {
-        child = spawn('luna-send', ['-n', '1000000', 'luna://com.webos.applicationManager/getForegroundAppInfo',
-            '{"subscribe":true}']);
-    } catch (e) {
-        log({ spawnErr: String((e && e.message) || e) });
+        child = spawn('luna-send', [
+            '-n',
+            '1000000',
+            'luna://com.webos.applicationManager/getForegroundAppInfo',
+            '{"subscribe":true}'
+        ]);
+    } catch (error) {
+        log({ spawnErr: String(error) });
         setTimeout(watch, 5000);
         return;
     }
-    let buf = '';
-    function extractObjects() {
-        // pull out balanced {...} blocks (handles pretty-printed multi-line JSON)
-        let out = [];
-        let depth = 0, inStr = false, esc = false, start = -1;
-        for (let i = 0; i < buf.length; i++) {
-            const c = buf[i];
-            if (inStr) {
-                if (esc) esc = false;
-                else if (c === '\\') esc = true;
-                else if (c === '"') inStr = false;
-            } else {
-                if (c === '"') inStr = true;
-                else if (c === '{') { if (depth === 0) start = i; depth++; }
-                else if (c === '}') {
-                    depth--;
-                    if (depth === 0 && start >= 0) {
-                        out.push(buf.slice(start, i + 1));
-                        start = -1;
-                    }
-                    if (depth < 0) depth = 0;
-                }
-            }
-        }
-        if (start >= 0) buf = buf.slice(start);
-        else if (out.length) buf = '';
-        else if (buf.length > 65536) buf = buf.slice(-4096);
-        return out;
-    }
+    const parse = createJsonStream(65536);
+    const decoder = new StringDecoder('utf8');
     child.stdout.on('data', (chunk) => {
-        buf += chunk.toString();
-        const objs = extractObjects();
-        for (const o of objs) {
-            try {
-                const msg = JSON.parse(o);
-                if (msg && typeof msg.appId === 'string') onForeground(msg.appId);
-            } catch (e) { /* ignore invalid */ }
+        if (reconnecting) return;
+        for (const message of parse(decoder.write(chunk))) {
+            if (typeof message.appId === 'string') onForeground(message.appId);
         }
     });
     let reconnecting = false;
@@ -265,13 +351,23 @@ function watch() {
         // spawn failure fires both 'error' and 'close'; one reconnect per child
         if (reconnecting) return;
         reconnecting = true;
+        foregroundApp = null;
+        fails = 0;
+        if (retryTimer !== null) {
+            clearTimeout(retryTimer);
+            retryTimer = null;
+        }
         log({ resubscribe: why });
-        try { child.kill(); } catch (e) {}
+        try {
+            child.kill();
+        } catch (e) {}
         setTimeout(watch, 3000);
     };
     child.on('error', () => reconnect('error'));
     child.on('close', (code) => reconnect('close:' + code));
-    child.stderr.on('data', (d) => { log({ childStderr: ('' + d).slice(0, 200) }); });
+    child.stderr.on('data', (d) => {
+        log({ childStderr: ('' + d).slice(0, 200) });
+    });
 }
 
 setTimeout(runProvision, 15000);

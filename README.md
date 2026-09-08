@@ -21,8 +21,9 @@ inputs, and a clock on a dark background, with navigation designed for a TV remo
 
 ## Get started
 
-**On your computer:** Python 3.10+ and Git. Contributors also need Node.js 22 or
-24 to run JavaScript regression tests. No Python packages or npm install are needed.
+**On your computer:** Python 3.10+ and Git. Contributors also need Node.js
+22.22.2+ (22.x) or 24.15+ (24.x), and the host-only npm development tools.
+No Python packages or npm runtime dependencies are deployed to the TV.
 
 **On the TV:** root access, SSH, Node.js, the platform-provided `webos-service`
 module, and the required Luna service registration and permissions. This project
@@ -32,6 +33,7 @@ compatibility matrix across TV models or firmware.
 ```sh
 git clone https://github.com/Pragalbha-Patil/webos-minimal-home.git
 cd webos-minimal-home
+npm ci --ignore-scripts
 python build_launcher.py
 python tools/check.py
 ```
@@ -88,11 +90,12 @@ flowchart LR
 
 | Location | Purpose |
 | --- | --- |
-| `build_launcher.py` | HTML, CSS, and frontend JavaScript source and generator |
+| `launcher-app/src/` | Frontend HTML template, CSS, and JavaScript sources |
+| `build_launcher.py` | Assembles sources and public fallback tiles into one page |
 | `launcher-app/config.json` | Source configuration and version |
-| `launcher-app/index.html` | Committed generated page; edit the generator |
-| `launcher-service/` | Luna relay, watcher, and shared runtime constants |
-| `tests/` | Python tests and Node VM regression harnesses |
+| `launcher-app/index.html` | Committed generated page; edit sources and rebuild |
+| `launcher-service/` | Luna relay, watcher, shared validation, storage, and stream parser |
+| `tests/` | Python, Node VM, and full DOM regression tests |
 | `tools/` | Shared checks, release packaging, and installer |
 | `docs/` | Configuration, architecture, installation, and coding standards |
 | `AGENTS.md`, `CLAUDE.md` | Coding-agent entry points |
@@ -105,7 +108,8 @@ boundaries, and webOS constraints.
 Documentation, bug reports, regression tests, accessibility work, and device
 compatibility reports are welcome. A TV is not required for most local work.
 Start with [CONTRIBUTING.md](CONTRIBUTING.md) and the
-[coding standards](docs/CODING_STANDARDS.md). Follow the
+[coding standards](docs/CODING_STANDARDS.md). The [testing guide](docs/TESTING.md)
+explains the enforced JavaScript coverage gates. Follow the
 [Code of Conduct](CODE_OF_CONDUCT.md); report vulnerabilities through
 [SECURITY.md](SECURITY.md).
 

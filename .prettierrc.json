@@ -1,0 +1,11 @@
+{
+  "tabWidth": 4,
+  "singleQuote": true,
+  "trailingComma": "none",
+  "overrides": [
+    {
+      "files": "launcher-app/src/*",
+      "options": { "tabWidth": 2, "singleQuote": false }
+    }
+  ]
+}

@@ -33,9 +33,12 @@ to restore modified globals.
 
 ## JavaScript on the TV
 
-The frontend embedded in `build_launcher.py` and the relay in `service.js`
-use ES5 syntax: `var`, functions, and callbacks. The relay uses four-space
-indentation and single quotes; keep the embedded template's existing conventions.
+The frontend in `launcher-app/src/launcher.js`, relay, and shared runtime modules
+use ES5 syntax: `var`, functions, and callbacks. ESLint enforces their syntax
+boundary, undefined/unused variable checks, and strict equality. Prettier enforces
+formatting: four spaces and single quotes in service modules, two spaces and double
+quotes in frontend sources. Run `npm run format` before rebuilding the page.
+The checked-in ESLint and Prettier configurations are authoritative.
 
 The root watcher already uses `const`, promises, async functions, and Node
 filesystem APIs. A syntax check on host Node does not prove these APIs work on
@@ -54,7 +57,7 @@ return to foreground.
 
 ## HTML and CSS
 
-Edit the generator, then rebuild. Escape text and attribute values at the output
+Edit `launcher-app/src/index.html` and `launcher.css`, then rebuild. Escape text and attribute values at the output
 boundary; do not concatenate untrusted launch-point content into markup.
 Keep focus visible and all interactive controls usable with D-pad, OK, and Back.
 A visual change should account for TV viewing distance and missing icons.
@@ -72,8 +75,11 @@ Do not make disruptive platform restarts an implicit part of file upload.
 
 ## Tests and documentation
 
-Use `unittest` and the existing Node VM harness pattern with mocked Luna,
-filesystem, timers, and child processes. Assert the behavior that would regress,
+Use `unittest` for Python and `node:test` for JavaScript. Reuse `tests/js/helpers.cjs`
+for isolated VM/jsdom harnesses with mocked Luna, filesystem, timers, and child
+processes. Exercise complete modules and DOM behavior rather than copying their
+implementation into a test. Preserve the [coverage gates](TESTING.md).
+Assert the behavior that would regress,
 rather than only the presence of a string in source. Keep bug fixtures small and
 synthetic. Give subprocess harnesses a timeout when adding or changing them.
 

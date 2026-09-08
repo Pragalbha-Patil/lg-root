@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__MH_TITLE__</title>
+<style>
+__MH_CSS__</style>
+</head>
+<body>
+<header>
+<h1 id="headLine"><span id="headText">__WELCOME_TEXT__</span> <b id="headBrand">__WELCOME_BRAND__</b></h1>
+<div class="hright">
+<div id="sysStats" aria-hidden="true"><div class="stat"><span class="label">CPU</span><span class="value" id="statCpu">--%</span></div><div class="sep"></div><div class="stat"><span class="label">RAM</span><span class="value" id="statRam">--%</span></div><div class="sep"></div><div class="stat"><span class="label">Temp</span><span class="value" id="statTemp">--&deg;C</span></div></div>
+<div id="settingsBtn" class="tile" tabindex="0" role="button" aria-label="Settings"><span class="gear">&#9881;</span><span>Settings</span></div>
+<div id="clock">--:--<small></small></div>
+</div>
+</header>
+<div class="section">Apps</div>
+<div class="row" id="grid">
+__APPS__
+</div>
+<div class="section">Inputs</div>
+<div class="row" id="inputs">
+__INPUTS__
+</div>
+<div class="section">System</div>
+<div class="row" id="sysrow">
+__SYS__
+</div>
+<div id="err"></div>
+<div id="dim" class="dim"></div>
+<div id="settingsPanel" class="panel">
+  <div class="panel-head">Settings <small id="panelSub">Minimal Home</small></div>
+  <div id="settingsRows" class="rowset"></div>
+</div>
+<div id="optionsPanel" class="panel opt">
+  <div class="panel-head">Options</div>
+  <div id="optionsRows" class="rowset"></div>
+</div>
+<div id="searchBox" class="search">
+  <div id="searchQ" class="q"></div>
+  <div id="searchRows" class="rowset"></div>
+  <div class="hint">type to find an app &#183; &#8592; &#8594; to move &#183; OK to open &#183; BACK to close</div>
+</div>
+
+<script>
+window.MH_CONFIG = __MH_CONFIG__;
+__MH_SHARED__
+__MH_JS__</script>
+</body>
+</html>

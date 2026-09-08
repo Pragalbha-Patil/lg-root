@@ -12,6 +12,9 @@ indent_size = 4
 indent_size = 2
 
 [launcher-service/constants.js]
+indent_size = 4
+
+[launcher-app/src/*]
 indent_size = 2
 
 [launcher-app/appinfo.json]

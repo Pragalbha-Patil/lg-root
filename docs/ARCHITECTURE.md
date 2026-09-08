@@ -17,7 +17,7 @@ when stock Home appears, provisions icons, and samples system statistics.
 
 | Source | Output or consumer |
 | --- | --- |
-| `build_launcher.py` template | `launcher-app/index.html` |
+| `launcher-app/src/` + `launcher-service/model.js` | Self-contained `launcher-app/index.html`, assembled by `build_launcher.py` |
 | `launcher-app/config.json` | Generated `launcher-service/config.json` |
 | Config version | `appinfo.json` version and embedded build string |
 | `launcher-app/tiles.json` | Static fallback tiles |
@@ -36,16 +36,25 @@ reports drift without writing files. Default builds ignore local usage snapshots
 | `service.js` | `getTiles`, `launchApp`, `openLGHome`, `getPrefs`, `setPrefs`, `getSystemStats` |
 | `watcher.js` | Foreground subscription/reconnects, redirect retries, icon copies, stats sampling |
 | `constants.js` | App/service IDs, install locations, state and log paths |
+| `model.js` | Pure validation, preferences, input classification, launch parameters, and sorting; shared with the frontend |
+| `storage.js` | Safe JSON reads, atomic state replacement, and bounded logs |
+| `json-stream.js` | Incremental, bounded parsing of chunked Luna subscription output |
 
 Home detection is event-driven. Other watcher work is periodic: icons refresh
 every five minutes and system statistics are sampled every five seconds when
-enabled. The watcher is not a zero-work idle process.
+enabled. The watcher is not a zero-work idle process. Redirect cooldowns schedule a
+retry; reconnections discard stale stream data and timers. Icons are size-checked
+before reading and identical bytes are not rewritten. Luna requests have deadlines
+and completion guards; the frontend retains only pending requests.
 
 ## Persistence
 
 The service directory stores `usage.json`, `prefs.json`, and `.noredirect`.
-Usage is a monotonically increasing launch sequence, capped at 60 entries, used
+Usage is a relative launch sequence, renumbered and capped at 60 entries, used
 for **recency**, not launch frequency. Pinned/hidden preferences are bounded.
+JSON state writes use a temporary file and rename; failed writes preserve the
+previous file. Preference updates are serialized in the frontend so rapid edits
+cannot arrive at the service out of order.
 The bypass stores an expiry timestamp for ten minutes.
 
 The watcher writes icons inside the app's `icons/` directory and a temporary
@@ -80,8 +89,10 @@ tests when changing classification.
 
 ## Test boundary
 
-Python unit tests cover configuration and rendering. Node VM harnesses exercise
-frontend fragments, the relay, and the watcher with mocked platform APIs.
-They check logic and failures without needing root or a TV. Desktop preview
+Python unit tests cover configuration, rendering, and packaging. Node VM harnesses
+execute the relay, watcher, and shared modules with mocked platform APIs. jsdom
+runs the complete frontend script against its HTML template with keyboard,
+focus, visibility, and service events. The [testing guide](TESTING.md) describes
+the enforced coverage gates. These checks need neither root nor a TV. Desktop preview
 cannot verify Luna authorization, service jailing, input switching, or remote
 key delivery; those need device evidence.

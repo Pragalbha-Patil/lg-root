@@ -27,7 +27,9 @@ does not provide a root exploit.
 Review changes that affect Luna authorization, launch parameter validation,
 remote commands, file paths, or uploaded files carefully. The relay depends on
 the platform-provided `webos-service` module in addition to Node built-ins;
-host tooling uses the Python standard library.
+Python build/package tooling uses the standard library. Host JavaScript checks
+use development packages pinned by `package-lock.json`; they are excluded from
+TV release payloads. Install them with `npm ci --ignore-scripts`.
 
 The installer stages an explicit runtime allowlist and preserves TV state.
 CI checks known private/runtime paths and generated output, but it is not a

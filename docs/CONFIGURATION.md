@@ -30,8 +30,9 @@ version strings fail the build. The committed fallback banner remains generic;
 the live relay supplies the configured greeting.
 
 Inputs are discovered from the TV's launch points. Do not add a fixed HDMI list
-to config. Keep the system allowlist explicit: the live relay currently treats
-an empty list as unrestricted system-app visibility.
+to config. The system allowlist is explicit: an empty list hides all system
+apps, including the Settings tile. The header gear still opens launcher preferences,
+and the LG Home bypass tile remains available.
 
 ## Launcher preferences
 
@@ -43,8 +44,10 @@ sort mode, and system statistics. Use the per-tile menu to pin/unpin or hide an 
 restore hidden apps from Settings. Reset all restores defaults.
 
 Preferences live in `prefs.json` next to the service on the TV, not in the build
-config. The installer preserves these files. Some UI labels say “Most used”;
-the underlying usage data is a recent-launch sequence, not a frequency count.
+config. The installer preserves these files. Recently used sorts by launch recency,
+with pinned apps first and configured priority as a fallback. Pinned first ignores
+recency and uses configured priority/title after pins. Alphabetical ignores pin
+ordering. Pin badges remain visible in every mode.
 
 ## Fallback tiles and personal usage
 

@@ -9,6 +9,7 @@ Task references:
 - [Contributor workflow](CONTRIBUTING.md)
 - [Coding standards](docs/CODING_STANDARDS.md)
 - [Architecture and webOS constraints](docs/ARCHITECTURE.md)
+- [Tests and coverage gates](docs/TESTING.md)
 - [Installation and device troubleshooting](docs/INSTALL.md)
 
 Keep reusable project knowledge in those shared documents. Personal device

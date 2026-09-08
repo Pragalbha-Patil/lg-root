@@ -16,15 +16,17 @@ logs. Security vulnerabilities belong in the [private reporting process](SECURIT
 
 ## Local setup
 
-Install Git, Python 3.10+, and Node.js 22 or 24. A POSIX shell is needed to test
-the installer; Git Bash or WSL works on Windows. There are no pip or npm
-dependencies to install. The `webos-service` module belongs to the TV runtime,
-and tests mock it locally.
+Install Git, Python 3.10+, and Node.js 22.22.2+ (22.x) or 24.15+ (24.x).
+A POSIX shell is needed to test the installer; Git Bash or WSL works on Windows.
+Install host-only lint, formatting, DOM, and coverage tools from the npm lockfile.
+No pip packages are needed. The `webos-service` module belongs to the TV runtime
+and is mocked locally. In PowerShell, use `npm.cmd` if script policy blocks `npm`.
 
 ```sh
 git clone https://github.com/YOUR-USERNAME/webos-minimal-home.git
 cd webos-minimal-home
 git switch -c fix/describe-the-change
+npm ci --ignore-scripts
 python build_launcher.py
 python tools/check.py
 ```
@@ -38,25 +40,32 @@ the TV's Node version.
 1. Find the source in the [architecture guide](docs/ARCHITECTURE.md).
 2. Follow the [coding standards](docs/CODING_STANDARDS.md) and existing conventions
    in the file you touch.
-3. For frontend changes, edit `build_launcher.py`, then regenerate. Commit
-   changed generated files together with their sources.
+3. For frontend changes, edit `launcher-app/src/`. Run `npm run format`, then
+   `python build_launcher.py`. Commit generated files together with their sources.
+   Shared validation changes in `launcher-service/model.js` also require a rebuild.
 4. Add a regression test for a behavior change or bug fix. Keep fixtures synthetic;
    never include device credentials, private snapshots, or session logs.
 5. Run `python tools/check.py` and review `git diff` and `git status --short`.
 6. Open a focused pull request explaining the problem, resulting behavior, and
    validation. State which device checks you could or could not perform.
 
-The check command verifies generated artifacts, Python/JavaScript syntax,
-JSON, local Markdown file links, shell syntax when available, regression tests,
-and diff whitespace. Node is mandatory so runtime tests cannot silently skip.
+The check command verifies generated artifacts, ESLint, Prettier, Python/JavaScript
+syntax, JSON, local Markdown file links, shell syntax when available, regression
+tests, JavaScript coverage thresholds, and diff whitespace. Node and npm development
+tools are mandatory so runtime tests cannot silently skip.
 Use `python tools/check.py --require-shell` for the Linux CI gate. Set `SH` to a
 POSIX shell executable if automatic detection fails.
 
 For a focused test while iterating:
 
 ```sh
-python -m unittest discover -s tests -p test_launch_params.py -v
+npm test
+npm run coverage
+python -m unittest discover -s tests -p test_build_launcher.py -v
 ```
+
+See [testing and coverage](docs/TESTING.md) for individual suites, report locations,
+coverage scope, and the limits of desktop tests.
 
 Do not hand-edit `launcher-app/index.html` or `launcher-service/config.json`.
 The generator also owns the version in `launcher-app/appinfo.json`.

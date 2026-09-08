@@ -1,0 +1,12 @@
+{
+  "all": true,
+  "include": ["launcher-app/src/**/*.js", "launcher-service/**/*.js"],
+  "reporter": ["text", "html", "json-summary"],
+  "reportsDir": "dist/coverage",
+  "checkCoverage": true,
+  "perFile": true,
+  "lines": 100,
+  "statements": 100,
+  "functions": 100,
+  "branches": 85
+}

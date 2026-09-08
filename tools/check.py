@@ -97,6 +97,8 @@ def main(argv=None):
         node = shutil.which("node")
         if not node:
             raise ValueError("Node.js is required: runtime regression tests must not silently skip")
+        if not (ROOT / "node_modules/eslint/bin/eslint.js").is_file():
+            raise ValueError("Run npm ci --ignore-scripts to install host-only development tools")
         shell = find_shell()
         if not shell and args.require_shell:
             raise ValueError("POSIX sh is required; install Git Bash/WSL or set SH")
@@ -113,6 +115,9 @@ def main(argv=None):
             raise ValueError("private/runtime files must not be tracked: " + ", ".join(forbidden))
         check_sources(paths)
         run([sys.executable, "build_launcher.py", "--check"])
+        run([node, "node_modules/eslint/bin/eslint.js", "launcher-app/src", "launcher-service", "tests/js"])
+        run([node, "node_modules/prettier/bin/prettier.cjs", "--check",
+             "launcher-app/src/*.js", "launcher-app/src/*.css", "launcher-service/*.js"])
         for name in paths:
             if name.endswith(".js") and (ROOT / name).is_file():
                 run([node, "--check", name])

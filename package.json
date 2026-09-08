@@ -1,0 +1,21 @@
+{
+  "name": "webos-minimal-home-dev",
+  "private": true,
+  "description": "Host-only linting and runtime regression tools",
+  "engines": { "node": "^22.22.2 || ^24.15.0 || >=26.0.0" },
+  "scripts": {
+    "lint": "eslint launcher-app/src launcher-service tests/js",
+    "test": "node --test --test-isolation=none tests/js/*.test.cjs",
+    "coverage": "c8 node --test --test-isolation=none tests/js/*.test.cjs",
+    "format": "prettier --write \"launcher-app/src/*.js\" \"launcher-app/src/*.css\" \"launcher-service/*.js\"",
+    "format:check": "prettier --check \"launcher-app/src/*.js\" \"launcher-app/src/*.css\" \"launcher-service/*.js\""
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "c8": "^12.0.0",
+    "eslint": "^10.10.0",
+    "globals": "^17.12.0",
+    "jsdom": "^30.0.1",
+    "prettier": "^3.9.6"
+  }
+}

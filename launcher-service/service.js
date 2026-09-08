@@ -1,330 +1,244 @@
+'use strict';
+
 var Service = require('webos-service');
 var fs = require('fs');
 var C = require('./constants');
-var LOG = C.SVC_LOG;
-var USAGE_FILE = C.USAGE_FILE;
-var CONFIG_FILE = C.CONFIG_FILE;
-var PREFS_FILE = C.PREFS_FILE;
-var SELF_ID = C.SELF_ID;
+var M = require('./model');
+var store = require('./storage')(fs);
+var log = store.logger(C.SVC_LOG, C.LOG_MAX_BYTES);
+var service = new Service(C.SELF_ID + '.service');
 
-var logSize = 0;
-function log(o) {
-    o.ts = Date.now();
-    try {
-        var line = JSON.stringify(o) + '\n';
-        logSize += line.length;
-        fs.appendFileSync(LOG, line);
-        if (logSize > 100000) {
-            // rotate by rewriting the current line; track size in memory so a
-            // hot path never pays a statSync per line
-            logSize = line.length;
-            fs.writeFileSync(LOG, line);
-        }
-    } catch (e) {}
-}
-function loadUsage() {
-    try { return JSON.parse(fs.readFileSync(USAGE_FILE, 'utf8')); }
-    catch (e) { return {}; }
-}
-var usageSeq = 0;
-function loadUsageCounted() {
-    var u = loadUsage();
-    var keys = Object.keys(u);
-    usageSeq = 0;
-    keys.forEach(function (k) {
-        if (typeof u[k] === 'number' && u[k] > usageSeq) usageSeq = u[k];
-    });
-    return u;
-}
-function saveUsage(u) {
-    try {
-        var keys = Object.keys(u);
-        if (keys.length > 60) {
-            keys.sort(function (a, b) { return u[a] - u[b]; });
-            keys.slice(0, keys.length - 60).forEach(function (k) { delete u[k]; });
-        }
-        fs.writeFileSync(USAGE_FILE, JSON.stringify(u));
-    } catch (e) {}
+function failure(error) {
+    return {
+        returnValue: false,
+        errorText: String(
+            (error && (error.errorText || error.message)) || error
+        )
+    };
 }
 
-var PREFS_DEFAULTS = {
-    accent: 'steel',
-    tileSize: 'standard',
-    labels: true,
-    clock24: false,
-    sort: 'mru',
-    pinned: [],
-    hidden: [],
-    showSystemStats: true,
-    dateFormat: 'HH:mm'
-};
-var PREFS_CHOICES = {
-    accent: ['steel', 'emerald', 'violet', 'amber', 'crimson'],
-    tileSize: ['compact', 'standard', 'large'],
-    sort: ['mru', 'alpha', 'pinned'],
-    dateFormat: ['HH:mm', 'h:mm A', 'HH:mm:ss', 'h:mm:ss A', 'MMM D, HH:mm', 'MMM D, h:mm A', 'YYYY-MM-DD HH:mm', 'DD/MM/YYYY HH:mm']
-};
-function cleanPrefs(partial) {
-    var out = {};
-    if (!partial || typeof partial !== 'object' || Array.isArray(partial)) return out;
-    Object.keys(partial).forEach(function (k) {
-        var v = partial[k];
-        if (PREFS_CHOICES[k] && PREFS_CHOICES[k].indexOf(v) >= 0) out[k] = v;
-        else if (k === 'labels' || k === 'clock24') out[k] = !!v;
-        else if (k === 'pinned' && Array.isArray(v)) {
-            out[k] = v.filter(function (x) { return typeof x === 'string' && x; }).slice(0, 30);
-        } else if (k === 'hidden' && Array.isArray(v)) {
-            out[k] = v.filter(function (x) { return typeof x === 'string' && x; }).slice(0, 60);
-        } else if (k === 'showSystemStats') {
-            out[k] = !!v;
-        } else if (k === 'dateFormat' && typeof v === 'string' && PREFS_CHOICES.dateFormat.indexOf(v) >= 0) {
-            out[k] = v;
+function register(name, handler) {
+    service.register(name, function (message) {
+        var answered = false;
+        function reply(result) {
+            if (answered) return;
+            answered = true;
+            log({
+                method: name,
+                ok: result.returnValue,
+                errorText: result.errorText
+            });
+            message.respond(result);
+        }
+        try {
+            handler(M.record(message.payload) ? message.payload : {}, reply);
+        } catch (error) {
+            reply(failure(error));
         }
     });
-    return out;
 }
+
+function callLuna(method, payload, reply, onSuccess) {
+    var complete = false;
+    var timer = setTimeout(function () {
+        finish(failure('Luna request timed out: ' + method));
+    }, C.LUNA_TIMEOUT_MS);
+    function finish(result) {
+        if (complete) return;
+        complete = true;
+        clearTimeout(timer);
+        try {
+            if (!M.record(result) || result.returnValue !== true) {
+                reply(
+                    failure(
+                        (result && result.errorText) ||
+                            'Invalid Luna response: ' + method
+                    )
+                );
+            } else onSuccess(result);
+        } catch (error) {
+            reply(failure(error));
+        }
+    }
+    try {
+        service.call(
+            'luna://com.webos.applicationManager/' + method,
+            payload,
+            function (response) {
+                finish(response && response.payload);
+            }
+        );
+    } catch (error) {
+        finish(failure(error));
+    }
+}
+
 function loadPrefs() {
-    var u = null;
-    try { u = JSON.parse(fs.readFileSync(PREFS_FILE, 'utf8')); } catch (e) {}
-    if (!u || typeof u !== 'object' || Array.isArray(u)) u = {};
-    var out = {};
-    Object.keys(PREFS_DEFAULTS).forEach(function (k) {
-        var v = u[k];
-        if (typeof PREFS_DEFAULTS[k] === 'boolean') out[k] = (typeof v === 'boolean') ? v : PREFS_DEFAULTS[k];
-        else if (Array.isArray(PREFS_DEFAULTS[k])) {
-            out[k] = (Array.isArray(v))
-                ? v.filter(function (x) { return typeof x === 'string' && x; })
-                : PREFS_DEFAULTS[k].slice();
-        } else out[k] = (typeof v === 'string' && v) ? v : PREFS_DEFAULTS[k];
-    });
-    var acc = PREFS_CHOICES.accent, ts = PREFS_CHOICES.tileSize, so = PREFS_CHOICES.sort;
-    if (acc.indexOf(out.accent) < 0) out.accent = PREFS_DEFAULTS.accent;
-    if (ts.indexOf(out.tileSize) < 0) out.tileSize = PREFS_DEFAULTS.tileSize;
-    if (so.indexOf(out.sort) < 0) out.sort = PREFS_DEFAULTS.sort;
-    out.pinned = out.pinned.slice(0, 30);
-    out.hidden = out.hidden.slice(0, 60);
-    return out;
+    return M.preferences(store.readJson(C.PREFS_FILE));
 }
-
-var service = new Service('org.minimal.home.service');
 
 function loadConfig() {
-    try {
-        var cfg = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
-        return (cfg && typeof cfg === 'object') ? cfg : {};
-    } catch (e) { return {}; }
-}
-var ALLOW_SYSTEM = (function () {
-    var u = loadConfig();
-    var ui = (u && u.ui) || {};
-    var list = (ui.system || []);
-    return list.filter(function (x) { return typeof x === 'string' && x; });
-})();
-
-// Mirrors build_launcher.py MH_INPUT_RE: the OS's fixed input-port app id
-// namespace. Inputs are never hardcoded per device -- which ports exist comes
-// from the live launch points (a port appears when a device is connected,
-// disappears when unplugged), plus lptype "bookmark" = input device.
-var INPUT_ID_RE = /^com\.webos\.app\.(livetv|hdmi\d+|av\d+|scart|dp\d+|usbc\d+)$/;
-function isInputLp(lp) {
-    if (!lp || !lp.id) return false;
-    if (lp.lptype === 'bookmark') return true;
-    return INPUT_ID_RE.test(lp.id);
+    var config = store.readJson(C.CONFIG_FILE);
+    return M.record(config) ? config : {};
 }
 
-service.register('getTiles', function (msg) {
-    try {
-        service.call('luna://com.webos.applicationManager/listLaunchPoints', {}, function (res) {
-            try {
-                var p = (res && res.payload) || {};
-                if (p.returnValue !== true || !Array.isArray(p.launchPoints)) {
-                    msg.respond({ returnValue: false, errorText: p.errorText || 'Invalid launch-point response' });
-                    return;
-                }
-                var usage = loadUsage();
-                var prefs = loadPrefs();
-                var hiddenSet = {}, pinIdx = {};
-                prefs.hidden.forEach(function (id) { if (id) hiddenSet[id] = 1; });
-                prefs.pinned.forEach(function (id, i) { if (id && !(id in pinIdx)) pinIdx[id] = i; });
-                var cfg = loadConfig() || {};
-                var cfgUI = cfg.ui || {};
-                var cfgHeader = (cfg.header && typeof cfg.header === 'object')
-                    ? { text: cfg.header.text, brand: cfg.header.brand } : null;
-                var priority = (Object.prototype.toString.call(cfgUI.appsPriority) === '[object Array]')
-                    ? cfgUI.appsPriority : [];
-                var out = [], inputs = [];
-                (p.launchPoints || []).forEach(function (lp) {
-                    if (!lp || typeof lp.id !== 'string' || !lp.id || lp.hidden || lp.id === SELF_ID) return;
-                    var isInp = isInputLp(lp);
-                    if (lp.systemApp && !isInp) {
-                        var sysOk = (ALLOW_SYSTEM.length === 0) || (ALLOW_SYSTEM.indexOf(lp.id) >= 0);
-                        if (!sysOk) return;
-                    }
-                    var t = {
-                        id: lp.id,
-                        title: lp.title || lp.id,
-                        icon: ICONS_PREFIX + lp.id.replace(/[\/\\]/g, '_') + '.png',
-                        params: (lp.params && Object.keys(lp.params).length) ? lp.params : null,
-                        pinned: (lp.id in pinIdx),
-                        hidden: (lp.id in hiddenSet)
-                    };
-                    (isInp ? inputs : out).push(t);
-                });
-                function pinRank(t) { return (t.id in pinIdx) ? 0 : 1; }
-                function keyOf(a, b) { // [usedIdx, usage, prioIdx, pinnedOrder?, title]
-                    var pa = pinRank(a), pb = pinRank(b);
-                    if (pa !== pb) return pa - pb;
-                    if (pa === 0) return pinIdx[a.id] - pinIdx[b.id];
-                    var ua = usage[a.id] || 0, ub = usage[b.id] || 0;
-                    if (ua !== ub) return ub - ua;
-                    var ia = priority.indexOf(a.id), ib = priority.indexOf(b.id);
-                    if (ia !== ib) return (ia < 0 ? 1e9 : ia) - (ib < 0 ? 1e9 : ib);
-                    var ta = (a.title || a.id || '').toLowerCase(), tb = (b.title || b.id || '').toLowerCase();
-                    if (ta !== tb) return ta < tb ? -1 : 1;
-                    return (a.id || '') < (b.id || '') ? -1 : 1;
-                }
-                out.sort(keyOf);
-                if (prefs.sort === 'alpha') {
-                    out.sort(function (a, b) {
-                        var ta = (a.title || a.id || '').toLowerCase(), tb = (b.title || b.id || '').toLowerCase();
-                        if (ta !== tb) return ta < tb ? -1 : 1;
-                        return (a.id || '') < (b.id || '') ? -1 : 1;
-                    });
-                }
-                log({ m: 'getTiles', n: out.length, inputs: inputs.length, sort: prefs.sort, pins: prefs.pinned.length,
-                      hidden: prefs.hidden.length, err: '' });
-                msg.respond({ returnValue: true, tiles: out, inputs: inputs, prefs: prefs, header: cfgHeader });
-            } catch (e) {
-                log({ m: 'getTiles', err: 'handler:' + (e && e.message) });
-                msg.respond({ returnValue: false, errorText: String((e && e.message) || e) });
-            }
-        });
-    } catch (e) {
-        log({ m: 'getTiles', err: 'call:' + (e && e.message) });
-        msg.respond({ returnValue: false, errorText: String((e && e.message) || e) });
-    }
-});
-
-var ICONS_PREFIX = 'icons/';
-
-var LAUNCH_PARAM_ALLOW = ['PhysicalAddress', 'uniqueId', 'value', 'displayId'];
-var CALLER = 'org.minimal.home';
-
-var HBOX_TITLE = /hdmi|livetv|av\d|scart|dp\d|usbc/i;
-
-function inputLaunchParams(id, cb) {
-    // Mirrors the default launcher: input/bookmark tiles are launched
-    // through their launch point, which carries the per-port params
-    // (e.g. PhysicalAddress + value) the input app needs to engage the
-    // port. Without them this launcher left the screen black.
-    if (id.indexOf('com.webos.app.') !== 0 || !HBOX_TITLE.test(id)) { cb(undefined); return; }
-    service.call('luna://com.webos.applicationManager/listLaunchPoints', {}, function (res) {
-        var rp = (res && res.payload) || {};
-        var lps = rp.launchPoints || [];
-        var lp = null;
-        for (var i = 0; i < lps.length; i++) if (lps[i].id === id) { lp = lps[i]; break; }
-        if (!lp || !lp.params || typeof lp.params !== 'object') { cb(undefined); return; }
-        var ps = {};
-        for (var k in lp.params) {
-            if (!Object.prototype.hasOwnProperty.call(lp.params, k)) continue;
-            if (k === 'id') continue;
-            var v = lp.params[k];
-            if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') ps[k] = v;
-        }
-        cb(Object.keys(ps).length ? ps : undefined);
+function recordLaunch(id) {
+    var usage = M.usage(store.readJson(C.USAGE_FILE));
+    var keys = Object.keys(usage).sort(function (a, b) {
+        return usage[a] - usage[b];
     });
+    // Renumbering preserves recency and avoids precision loss in long-lived stores.
+    var next = 0;
+    keys.forEach(function (key) {
+        usage[key] = ++next;
+    });
+    usage[id] = ++next;
+    keys = Object.keys(usage).sort(function (a, b) {
+        return usage[b] - usage[a];
+    });
+    keys.slice(60).forEach(function (key) {
+        delete usage[key];
+    });
+    try {
+        store.writeJson(C.USAGE_FILE, usage);
+    } catch (error) {
+        log({ method: 'recordLaunch', errorText: String(error) });
+    }
 }
 
-service.register('launchApp', function (msg) {
-    try {
-        var pl = msg.payload || {};
-        var caller = (msg.callerId || '').toString();
-        log({ m: 'launchApp-caller', caller: caller });
-        inputLaunchParams(pl.id, function (lpParams) {
-            var p = { id: pl.id, callerId: CALLER };
-            var src = lpParams !== undefined ? lpParams : pl.params;
-            if (src && typeof src === 'object') {
-                for (var k in src) {
-                    if (!Object.prototype.hasOwnProperty.call(src, k)) continue;
-                    if (k === 'id') continue;
-                    if (LAUNCH_PARAM_ALLOW.indexOf(k) < 0) continue;
-                    p[k] = src[k];
-                }
-            }
-            if (lpParams !== undefined) log({ m: 'launchApp-src', id: pl.id, lp: !!lpParams });
-            p.id = pl.id;
-            service.call('luna://com.webos.applicationManager/launch', p, function (res) {
-                var rp = (res && res.payload) || {};
-                if (rp.returnValue && pl.id) {
-                    var u = loadUsageCounted();
-                    usageSeq += 1;
-                    u[pl.id] = usageSeq;
-                    saveUsage(u);
-                }
-                log({ m: 'launchApp', id: pl.id, ok: !!rp.returnValue, err: rp.errorText || '' });
-                msg.respond(rp.returnValue !== undefined ? rp : { returnValue: false });
-            });
-        });
-    } catch (e) {
-        log({ m: 'launchApp', err: 'call:' + (e && e.message) });
-        msg.respond({ returnValue: false, errorText: String((e && e.message) || e) });
-    }
-});
-
-service.register('openLGHome', function (msg) {
-    try {
-        fs.writeFileSync(C.BYPASS_FILE, String(Date.now() + 10*60*1000));
-        service.call('luna://com.webos.applicationManager/launch', { id: C.HOME_ID }, function (res) {
-            var rp = (res && res.payload) || {};
-            log({ m: 'openLGHome', ok: !!rp.returnValue });
-            msg.respond(rp.returnValue !== undefined ? rp : { returnValue: false });
-        });
-    } catch (e) {
-        log({ m: 'openLGHome', err: String((e && e.message) || e) });
-        msg.respond({ returnValue: false, errorText: String((e && e.message) || e) });
-    }
-});
-
-service.register('getPrefs', function (msg) {
-    try {
+register('getTiles', function (payload, reply) {
+    callLuna('listLaunchPoints', {}, reply, function (response) {
+        if (!Array.isArray(response.launchPoints))
+            throw new Error('Invalid launch-point response');
+        var config = loadConfig();
+        var ui = M.record(config.ui) ? config.ui : {};
+        var allowed = M.ids(ui.system, 1000);
+        var priority = M.ids(ui.appsPriority, 1000);
         var prefs = loadPrefs();
-        log({ m: 'getPrefs', err: '' });
-        msg.respond({ returnValue: true, prefs: prefs });
-    } catch (e) {
-        log({ m: 'getPrefs', err: 'call:' + (e && e.message) });
-        msg.respond({ returnValue: false, errorText: String((e && e.message) || e) });
-    }
+        var usage = M.usage(store.readJson(C.USAGE_FILE));
+        var tiles = [],
+            inputs = [],
+            seen = Object.create(null);
+        response.launchPoints.forEach(function (lp) {
+            if (
+                !M.record(lp) ||
+                !M.validId(lp.id) ||
+                lp.hidden ||
+                lp.id === C.SELF_ID ||
+                seen[lp.id]
+            )
+                return;
+            var input = M.input(lp);
+            if (
+                !input &&
+                (lp.systemApp || lp.id === C.SETTINGS_ID) &&
+                allowed.indexOf(lp.id) < 0
+            )
+                return;
+            seen[lp.id] = true;
+            var tile = {
+                id: lp.id,
+                title:
+                    typeof lp.title === 'string' && lp.title ? lp.title : lp.id,
+                icon: 'icons/' + lp.id + '.png',
+                params: M.record(lp.params) ? lp.params : null,
+                pinned: prefs.pinned.indexOf(lp.id) >= 0,
+                hidden: prefs.hidden.indexOf(lp.id) >= 0
+            };
+            (input ? inputs : tiles).push(tile);
+        });
+        var header = M.record(config.header) ? config.header : {};
+        reply({
+            returnValue: true,
+            tiles: M.sortTiles(tiles, prefs, usage, priority),
+            inputs: M.sortTiles(inputs, prefs, usage, []),
+            prefs: prefs,
+            header: {
+                text: typeof header.text === 'string' ? header.text : '',
+                brand: typeof header.brand === 'string' ? header.brand : ''
+            }
+        });
+    });
 });
 
-service.register('setPrefs', function (msg) {
-    try {
-        var upd = cleanPrefs(msg.payload || {});
-        var cur = loadPrefs();
-        Object.keys(upd).forEach(function (k) { cur[k] = upd[k]; });
-        fs.writeFileSync(PREFS_FILE, JSON.stringify(cur));
-        log({ m: 'setPrefs', keys: Object.keys(upd).length, err: '' });
-        msg.respond({ returnValue: true, prefs: cur });
-    } catch (e) {
-        log({ m: 'setPrefs', err: 'call:' + (e && e.message) });
-        msg.respond({ returnValue: false, errorText: String((e && e.message) || e) });
+register('launchApp', function (payload, reply) {
+    if (!M.validId(payload.id)) throw new Error('A valid app id is required');
+    function launch(params) {
+        var request = M.params(params);
+        request.id = payload.id;
+        request.callerId = C.SELF_ID;
+        callLuna('launch', request, reply, function (response) {
+            recordLaunch(payload.id);
+            reply(response);
+        });
     }
+    // Bookmark inputs can have custom IDs outside the platform input namespace.
+    if (
+        !M.input({ id: payload.id }) &&
+        !Object.keys(M.params(payload.params)).length
+    ) {
+        launch(payload.params);
+        return;
+    }
+    callLuna('listLaunchPoints', {}, reply, function (response) {
+        if (!Array.isArray(response.launchPoints))
+            throw new Error('Invalid launch-point response');
+        var match = response.launchPoints.filter(function (lp) {
+            return M.record(lp) && lp.id === payload.id;
+        })[0];
+        launch(match && M.record(match.params) ? match.params : payload.params);
+    });
 });
 
-service.register('getSystemStats', function (msg) {
-    try {
-        var stats = { cpu: null, ram: null, temp: null };
-        try {
-            var raw = fs.readFileSync('/tmp/minhome-stats.json', 'utf8');
-            var sample = JSON.parse(raw);
-            if (sample && typeof sample.timestamp === 'number' &&
-                Date.now() - sample.timestamp >= 0 && Date.now() - sample.timestamp < 20000) stats = sample;
-        } catch (e) {}
-        log({ m: 'getSystemStats', cpu: stats.cpu, ram: stats.ram, temp: stats.temp });
-        msg.respond({ returnValue: true, cpu: stats.cpu, ram: stats.ram, temp: stats.temp });
-    } catch (e) {
-        log({ m: 'getSystemStats', err: String((e && e.message) || e) });
-        msg.respond({ returnValue: false, errorText: String((e && e.message) || e) });
-    }
+register('openLGHome', function (payload, reply) {
+    fs.writeFileSync(C.BYPASS_FILE, String(Date.now() + C.BYPASS_MS));
+    callLuna(
+        'launch',
+        { id: C.HOME_ID },
+        function (result) {
+            // If Home did not open, do not strand the user in a ten-minute bypass.
+            try {
+                fs.unlinkSync(C.BYPASS_FILE);
+            } catch (error) {
+                log({ bypassCleanup: String(error) });
+            }
+            reply(result);
+        },
+        reply
+    );
 });
 
-log({ m: 'service-start', err: '' });
+register('getPrefs', function (payload, reply) {
+    reply({ returnValue: true, prefs: loadPrefs() });
+});
+
+register('setPrefs', function (payload, reply) {
+    var prefs = loadPrefs();
+    var update = M.cleanPrefs(payload);
+    Object.keys(update).forEach(function (key) {
+        prefs[key] = update[key];
+    });
+    store.writeJson(C.PREFS_FILE, prefs);
+    reply({ returnValue: true, prefs: prefs });
+});
+
+register('getSystemStats', function (payload, reply) {
+    var sample = store.readJson(C.STATS_FILE);
+    var stats = { cpu: null, ram: null, temp: null };
+    if (M.record(sample) && typeof sample.timestamp === 'number') {
+        var age = Date.now() - sample.timestamp;
+        if (age >= 0 && age < 20000) {
+            stats.cpu = M.metric(sample.cpu, 0, 100);
+            stats.ram = M.metric(sample.ram, 0, 100);
+            stats.temp = M.metric(sample.temp, -100, 200);
+        }
+    }
+    reply({
+        returnValue: true,
+        cpu: stats.cpu,
+        ram: stats.ram,
+        temp: stats.temp
+    });
+});
+
+log({ method: 'service-start' });
