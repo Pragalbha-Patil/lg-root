@@ -4,6 +4,7 @@ Run `python build_launcher.py` to regenerate launcher-app/index.html and appinfo
 Use `--check` to verify tracked outputs are up to date (CI gate).
 """
 import argparse
+import math
 import json
 import os
 import sys
@@ -71,7 +72,9 @@ def load_usage():
             with open(p, encoding="utf-8") as f:
                 u = json.load(f)
             if isinstance(u, dict):
-                return u
+                return {key: value for key, value in u.items()
+                        if isinstance(value, (int, float)) and not isinstance(value, bool)
+                        and (isinstance(value, int) or math.isfinite(value)) and value >= 0}
         except Exception:
             continue
     return {}
