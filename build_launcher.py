@@ -392,7 +392,7 @@ def build(version=None):
         "__MH_VERSION__": "v" + version,
         "__MH_INPUT_IDS__": json.dumps([i for i in cfg["ui"]["inputs"] if i]),
         "__MH_SYS_IDS__": json.dumps(sys_ids),
-        "__MH_SETTINGS_TILE__": json.dumps(settings_tile),
+        "__MH_SETTINGS_TILE__": json.dumps(settings_tile if SETTINGS_ID in sys_ids else None),
         "__MH_TITLE__": htmllib.escape(header_brand),
         "__WELCOME_TEXT__": htmllib.escape(header_text),
         "__WELCOME_BRAND__": htmllib.escape(header_brand),
