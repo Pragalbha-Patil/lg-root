@@ -35,8 +35,8 @@ All contributors are expected to follow our [Code of Conduct](CODE_OF_CONDUCT.md
 1. Fork the repository.
 2. Clone your fork:
    ```sh
-   git clone https://github.com/<your-user>/lg-root.git
-   cd lg-root
+   git clone https://github.com/<your-user>/webos-minimal-home.git
+   cd webos-minimal-home
    ```
 3. Create a branch:
    ```sh

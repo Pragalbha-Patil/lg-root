@@ -52,8 +52,8 @@ No recommendations rows. No promotional tiles. No carousel of content you will n
 ## Build
 
 ```sh
-git clone https://github.com/Pragalbha-Patil/lg-root.git
-cd lg-root
+git clone https://github.com/Pragalbha-Patil/webos-minimal-home.git
+cd webos-minimal-home
 python build_launcher.py
 ```
 
@@ -260,7 +260,7 @@ app -->|getPrefs/setPrefs: settings, pins, hidden| svc
 ## Repository layout
 
 ```
-lg-root/
+webos-minimal-home/
 ├── build_launcher.py        # build-time generator for the launcher page
 ├── launcher-app/            # the webOS web app (what runs on screen)
 │   ├── appinfo.json         # webOS app manifest
