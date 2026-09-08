@@ -1,4 +1,4 @@
-"""Assemble the Minimal Home frontend sources and fallback tiles.
+"""Assemble the Minimal Home frontend sources and optional preview tiles.
 
 Run `python build_launcher.py` to regenerate the page, manifest version, and service config.
 Use `--check` to verify tracked outputs are up to date (CI gate).
@@ -180,10 +180,12 @@ def load_template():
 
 
 
-def build(version=None, usage_path=None):
+def build(version=None, usage_path=None, preview=False):
     cfg = load_config()
+    if usage_path and not preview:
+        raise ValueError("--usage requires --preview")
     usage = load_usage(usage_path)
-    apps, inputs, sysrow = classify(load_tiles(), cfg)
+    apps, inputs, sysrow = classify(load_tiles(), cfg) if preview else ([], [], [])
     version = version or cfg.get("version") or "1.0.0"
     if not re.fullmatch(r"\d+\.\d+\.\d+", version):
         raise ValueError("version must be MAJOR.MINOR.PATCH")
@@ -200,6 +202,7 @@ def build(version=None, usage_path=None):
     inject = {
         "__MH_CONFIG__": json.dumps({"version": "v" + version, "system": sys_ids,
                                      "settingsTile": settings_tile if SETTINGS_ID in sys_ids else None}).replace("<", "\\u003c"),
+        "__LOADING_DISPLAY__": "none" if preview else "flex",
         "__MH_TITLE__": htmllib.escape(header_brand),
         "__WELCOME_TEXT__": htmllib.escape(header_text),
         "__WELCOME_BRAND__": htmllib.escape(header_brand),
@@ -236,11 +239,12 @@ def main(argv=None):
     ap.add_argument("--check", action="store_true",
                     help="verify committed build output is up to date (no writes)")
     ap.add_argument("--version", default=None, help="override version")
+    ap.add_argument("--preview", action="store_true", help="include sample tiles for desktop preview only")
     ap.add_argument("--usage", metavar="PATH", help="bake a personal usage snapshot (local builds only)")
     args = ap.parse_args(argv)
 
     try:
-        out, (na, ni, ns), usage = build(args.version, args.usage)
+        out, (na, ni, ns), usage = build(args.version, args.usage, args.preview)
     except (OSError, ValueError) as exc:
         ap.exit(1, "error: %s\n" % exc)
 
@@ -258,7 +262,7 @@ def main(argv=None):
                 with open(path, "w", encoding="utf-8", newline="\n") as f:
                     f.write(content)
 
-    print("baked apps=%d inputs=%d sys=%d" % (na, ni, ns))
+    print("preview apps=%d inputs=%d sys=%d" % (na, ni, ns))
     if usage:
         print("baking MRU order for %d apps" % len(usage))
     if args.check:

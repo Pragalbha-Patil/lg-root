@@ -7,7 +7,7 @@ const port = { id: 'com.webos.app.hdmi2', title: 'PlayStation', params: { id: 'w
 function appFor(t, options = {}) {
     const app = browser(options); t.after(() => app.close()); return app;
 }
-function ready(app, data = {}) { app.tiles({ tiles: [video], inputs: [port], ...data }); app.prefs(); }
+function ready(app, data = {}) { app.tiles({ tiles: [video], inputs: [port], prefs: {}, ...data }); }
 function save(app) {
     const call = app.calls.find(c => c.method === 'setPrefs' && !c.answered);
     return app.respond('setPrefs', { returnValue: true, prefs: call.parameters });
@@ -15,12 +15,12 @@ function save(app) {
 function ids(app, section) { return [...app.document.querySelectorAll('#' + section + ' .tile')].map(el => el.dataset.id); }
 function row(app, key) { return app.document.querySelector('#settingsRows [data-key="' + key + '"]'); }
 
-test('all startup response orders and preferences preserve inputs and sorting', t => {
-    for (const order of ['tiles-first', 'prefs-first']) for (const size of ['compact', 'standard', 'large']) {
+test('bundled and legacy preferences preserve inputs and sorting', t => {
+    for (const order of ['bundled', 'legacy']) for (const size of ['compact', 'standard', 'large']) {
         for (const sort of ['mru', 'alpha', 'pinned']) {
             const app = appFor(t); const data = { tiles: [video], inputs: [port, { id: 'av', title: 'AV' }] };
             const prefs = { tileSize: size, sort, pinned: [port.id], hidden: [], labels: false, showSystemStats: false, dateFormat: 'HH:mm:ss' };
-            if (order === 'tiles-first') { app.tiles(data); app.prefs(prefs); } else { app.prefs(prefs); app.tiles(data); }
+            if (order === 'bundled') app.tiles({ ...data, prefs }); else { app.tiles(data); app.prefs(prefs); }
             assert.deepEqual(ids(app, 'inputs'), sort === 'alpha' ? ['av', port.id] : [port.id, 'av']);
             assert.ok(app.document.body.classList.contains('density-' + size));
             assert.ok(app.document.body.classList.contains('no-labels'));
@@ -45,13 +45,13 @@ test('completed service requests are released, duplicate replies ignored, and ex
 test('Palm bridge fallback handles valid, failed, malformed, thrown and missing platform APIs', async t => {
     for (const options of [{ bridgeOnly: true }, { throwRequest: true }]) {
         const app = appFor(t, options);
-        assert.equal(app.bridges.length, 2);
+        assert.equal(app.bridges.length, 1);
         app.bridges[0].onservicecallback(JSON.stringify({ returnValue: true, tiles: [video], inputs: [] }));
         app.bridges[1].onservicecallback('{bad');
         assert.deepEqual(ids(app, 'grid'), ['video']); assert.equal(app.window.__mhKeep.length, 0);
     }
     const failed = appFor(t, { bridgeOnly: true });
-    failed.bridges[0].onservicecallback('{"returnValue":false}'); failed.bridges[1].onservicecallback('null');
+    failed.bridges[0].onservicecallback('{"returnValue":false}');
     assert.equal(failed.window.__mhKeep.length, 0);
     for (const options of [{ offline: true }, { bridgeOnly: true, throwBridge: true }, { bridgeOnly: true, throwBridgeCall: true }]) {
         const app = appFor(t, options); assert.equal(app.window.__mhKeep.length, 0);
@@ -134,7 +134,7 @@ test('options Launch and Close rows work and unrelated overlay keys are ignored'
 });
 
 test('Settings tile opens launcher preferences and TV settings action launches the platform settings', async t => {
-    const app = appFor(t); ready(app);
+    const app = appFor(t); ready(app, { tiles: [video, { id: C.SETTINGS_ID, title: 'Settings' }] });
     app.click('[data-id="' + C.SETTINGS_ID + '"]'); assert.ok(app.document.querySelector('#settingsPanel.show'));
     app.click('[data-key="tvsettings"]'); assert.equal(app.calls.at(-1).parameters.id, C.SETTINGS_ID);
     app.respond('launchApp', { returnValue: true }); await app.clock.run(250);
@@ -210,7 +210,7 @@ test('blur/background cancels held keys and skips stats polling; foreground relo
     await app.clock.run(450); await app.clock.run(700); assert.equal(app.document.querySelector('#optionsPanel.show'), null);
     app.visible(false); await app.clock.run(1000);
     assert.equal(app.calls.filter(c => c.method === 'getSystemStats').length, 0);
-    app.visible(true); app.prefs({ showSystemStats: false }); app.tiles();
+    app.visible(true); app.tiles({ prefs: { showSystemStats: false } });
     await app.clock.run(5000); assert.equal(app.calls.filter(c => c.method === 'getSystemStats').length, 0);
 });
 
@@ -221,7 +221,7 @@ test('webOS foreground focus overrides a stale hidden state for tiles and stats'
     await app.clock.run(1000);
     assert.equal(app.calls.filter(c => c.method === 'getSystemStats').length, 1);
     app.visible(false);
-    assert.equal(app.calls.filter(c => c.method === 'getPrefs').length, 2);
+    assert.equal(app.calls.filter(c => c.method === 'getTiles').length, 2);
 });
 
 test('stats render numbers and unknowns, and header updates use text rather than HTML', async t => {
@@ -234,8 +234,9 @@ test('stats render numbers and unknowns, and header updates use text rather than
     assert.ok(app.document.querySelector('#clock small').textContent.length);
 });
 
-test('fallback tiles and keyboard Settings work before the relay answers, including malformed parameters', async t => {
+test('live tiles handle malformed parameters and keyboard Settings works', async t => {
     const app = appFor(t);
+    ready(app);
     app.document.querySelector('#grid .tile').dataset.params = '{broken';
     app.click('#grid .tile'); assert.deepEqual(Object.keys(app.calls.at(-1).parameters.params), []);
     app.respond('launchApp', { returnValue: true }); await app.clock.run(250);
@@ -255,4 +256,192 @@ test('live system tiles remain unique, multiple pins keep their order, and unkno
     const unknown = app.document.createElement('div'); unknown.className = 'srow'; unknown.dataset.key = 'removed-setting';
     app.document.querySelector('#settingsRows').appendChild(unknown);
     const count = app.calls.length; unknown.click(); assert.equal(app.calls.length, count);
+});
+
+
+test('startup waits for TV discovery and does not invent system apps', t => {
+    const app = appFor(t);
+    for (const row of ['grid', 'inputs', 'sysrow']) assert.deepEqual(ids(app, row), []);
+    assert.equal(app.document.querySelector('#tileStatus').style.display, 'flex');
+    assert.equal(app.calls.filter(c => c.method === 'getPrefs').length, 0);
+    assert.deepEqual(ids(app, 'sysrow'), []);
+    app.tiles({ prefs: {} });
+    assert.equal(app.document.querySelector('#tileStatus').style.display, 'none');
+    assert.deepEqual(ids(app, 'sysrow'), ['__LGHOME__']);
+    assert.equal(app.document.activeElement.dataset.id, '__LGHOME__');
+});
+
+test('failed discovery stops spinning after bounded retries and Retry recovers', async t => {
+    const app = appFor(t);
+    for (let i = 0; i < 6; i++) {
+        app.respond('getTiles', { returnValue: false });
+        if (i < 5) await app.clock.run(2500);
+    }
+    assert.equal(app.document.querySelector('#tileSpinner').style.display, 'none');
+    assert.equal(app.document.querySelector('#retryTiles').style.display, 'block');
+    assert.deepEqual(ids(app, 'grid'), []);
+    const settings = app.document.querySelector('#settingsBtn');
+    const retry = app.document.querySelector('#retryTiles');
+    settings.getBoundingClientRect = () => ({ left: 0, top: 0, width: 100, height: 50 });
+    retry.getBoundingClientRect = () => ({ left: 0, top: 100, width: 100, height: 50 });
+    settings.focus(); app.key(40); app.key(40, 'keyup');
+    assert.equal(app.document.activeElement, retry);
+    app.click('#retryTiles');
+    assert.equal(app.document.querySelector('#tileSpinner').style.display, 'block');
+    app.tiles({ tiles: [video], inputs: [port] });
+    assert.deepEqual(ids(app, 'grid'), ['video']);
+    assert.deepEqual(ids(app, 'inputs'), [port.id]);
+    assert.equal(app.document.querySelector('#tileStatus').style.display, 'none');
+});
+
+
+test('explicit desktop preview tiles retain their click handlers', t => {
+    const app = appFor(t, { prepare(window) {
+        window.document.querySelector('#grid').innerHTML = '<div class="tile" tabindex="0" data-id="preview">Preview</div>';
+    } });
+    app.click('#grid .tile');
+    assert.equal(app.calls.at(-1).parameters.id, 'preview');
+});
+
+
+test('unchanged discovery and preferences preserve tiles, decoded icon fallback and focus', async t => {
+    const app = appFor(t); ready(app);
+    const tile = app.document.querySelector('#grid .tile');
+    tile.querySelector('img').dispatchEvent(new app.window.Event('error'));
+    const art = tile.querySelector('.initial');
+    tile.focus();
+    app.window.dispatchEvent(new app.window.Event('focus'));
+    app.tiles({ tiles: [video], inputs: [port] });
+    assert.equal(app.document.querySelector('#grid .tile'), tile);
+    assert.equal(tile.querySelector('.initial'), art);
+    assert.equal(app.document.activeElement, tile);
+    await app.clock.run(400);
+    app.visible(true); app.tiles({ tiles: [video], inputs: [port], prefs: {} });
+    assert.equal(app.document.querySelector('#grid .tile'), tile);
+    await app.clock.run(400);
+    app.window.dispatchEvent(new app.window.Event('focus'));
+    app.tiles({ tiles: [{ ...video, title: 'Renamed' }], inputs: [port], prefs: {} });
+    assert.equal(app.document.querySelector('#grid .label').textContent, 'Renamed');
+});
+
+test('relaunch refreshes live tiles and a background event cannot consume the foreground refresh', async t => {
+    const app = appFor(t); ready(app);
+    const before = app.calls.filter(c => c.method === 'getTiles').length;
+    app.visible(false);
+    app.document.dispatchEvent(new app.window.Event('webOSRelaunch'));
+    assert.equal(app.calls.filter(c => c.method === 'getTiles').length, before);
+    app.visible(true);
+    assert.equal(app.calls.filter(c => c.method === 'getTiles').length, before + 1);
+    app.tiles({ tiles: [video], inputs: [port] }); app.prefs();
+    await app.clock.run(400);
+    app.document.dispatchEvent(new app.window.Event('webOSRelaunch'));
+    app.window.dispatchEvent(new app.window.Event('focus'));
+    assert.equal(app.calls.filter(c => c.method === 'getTiles').length, before + 2);
+});
+
+test('changed discovery does not steal focus from an open settings panel', t => {
+    const app = appFor(t); ready(app); app.click('#settingsBtn');
+    const focused = app.document.activeElement;
+    app.window.dispatchEvent(new app.window.Event('focus'));
+    app.tiles({ tiles: [{ ...video, title: 'Updated' }], inputs: [port] });
+    assert.equal(app.document.activeElement, focused);
+});
+
+
+test('one startup response applies preferences before any visible tiles are inserted', t => {
+    const app = appFor(t);
+    assert.deepEqual(app.calls.map(c => c.method), ['getTiles']);
+    const observer = new app.window.MutationObserver(() => {});
+    observer.observe(app.document.querySelector('#grid'), { childList: true });
+    app.tiles({ tiles: [video, { id: 'hidden', title: 'Hidden' }], inputs: [port],
+        prefs: { hidden: ['hidden'], labels: false, tileSize: 'compact', showSystemStats: false } });
+    assert.deepEqual(ids(app, 'grid'), ['video']);
+    assert.ok(app.document.body.classList.contains('density-compact'));
+    assert.ok(app.document.body.classList.contains('no-labels'));
+    const added = observer.takeRecords().flatMap(r => [...r.addedNodes]).map(n => n.dataset?.id);
+    assert.deepEqual(added, ['video']); observer.disconnect();
+    assert.equal(app.calls.filter(c => c.method === 'getPrefs').length, 0);
+    app.visible(false); app.visible(true);
+    app.tiles({ tiles: [video], inputs: [port], prefs: { labels: true } });
+    assert.equal(app.document.body.classList.contains('no-labels'), false);
+    assert.equal(app.calls.filter(c => c.method === 'getPrefs').length, 0);
+});
+
+test('bundled preferences requested before an edit cannot overwrite it after saving', t => {
+    const app = appFor(t);
+    app.click('#settingsBtn'); app.click('[data-key="labels"]'); save(app);
+    app.tiles({ tiles: [video], inputs: [], prefs: { labels: true } });
+    assert.equal(app.document.body.classList.contains('no-labels'), true);
+});
+
+test('bundled preferences requested during a save cannot overwrite the saved value', t => {
+    for (const finishFirst of [false, true]) {
+        const app = appFor(t); ready(app);
+        app.click('#settingsBtn'); app.click('[data-key="labels"]');
+        app.visible(false); app.visible(true);
+        if (finishFirst) save(app);
+        app.tiles({ tiles: [video], inputs: [port], prefs: { labels: true } });
+        assert.equal(app.document.body.classList.contains('no-labels'), true);
+        assert.equal(app.calls.filter(c => c.method === 'getPrefs').length, 0);
+        if (!finishFirst) save(app);
+    }
+});
+
+test('a malformed legacy preference response leaves the rendered launcher usable', t => {
+    const app = appFor(t); app.tiles({ tiles: [video] });
+    app.respond('getPrefs', { returnValue: true, prefs: null });
+    assert.deepEqual(ids(app, 'grid'), ['video']);
+    app.click('#grid .tile'); assert.equal(app.calls.at(-1).parameters.id, 'video');
+});
+
+test('minute clock aligns to rollover, preserves unchanged DOM, and pauses in the background', async t => {
+    let now = new Date(2026, 0, 1, 23, 59, 30, 250).getTime();
+    const app = appFor(t, { prepare(window) {
+        const NativeDate = window.Date;
+        window.Date = class extends NativeDate {
+            constructor(...args) { super(...(args.length ? args : [now])); }
+            static now() { return now; }
+        };
+    } });
+    ready(app, { prefs: { dateFormat: 'HH:mm', showSystemStats: false } });
+    const clock = app.document.querySelector('#clock');
+    assert.equal(clock.firstChild.textContent, '23:59');
+    assert.ok([...app.clock.pending.values()].some(timer => timer.delay === 29750));
+    const small = clock.querySelector('small');
+    app.window.dispatchEvent(new app.window.Event('focus'));
+    assert.equal(clock.querySelector('small'), small);
+    now += 29750; await app.clock.run(29750);
+    assert.equal(clock.firstChild.textContent, '00:00');
+    assert.match(clock.querySelector('small').textContent, /2 Jan/);
+    assert.equal([...app.clock.pending.values()].filter(timer => timer.delay === 60000).length, 1);
+    app.visible(false);
+    assert.equal([...app.clock.pending.values()].filter(timer => timer.delay === 60000).length, 0);
+    const paused = clock.innerHTML;
+    now += 120000; await app.clock.run(60000);
+    assert.equal(clock.innerHTML, paused);
+    app.visible(true);
+    assert.equal(clock.firstChild.textContent, '00:02');
+    assert.equal([...app.clock.pending.values()].filter(timer => timer.delay === 60000).length, 1);
+});
+
+test('clock switches between second and minute cadence and honors focused webOS foreground', async t => {
+    let now = new Date(2026, 0, 1, 12, 30, 10, 250).getTime();
+    const app = appFor(t, { hidden: true, focused: true, prepare(window) {
+        const NativeDate = window.Date;
+        window.Date = class extends NativeDate {
+            constructor(...args) { super(...(args.length ? args : [now])); }
+            static now() { return now; }
+        };
+    } });
+    ready(app, { prefs: { dateFormat: 'HH:mm:ss', showSystemStats: false } });
+    const clock = app.document.querySelector('#clock');
+    assert.equal(clock.firstChild.textContent, '12:30:10');
+    assert.ok([...app.clock.pending.values()].some(timer => timer.delay === 750));
+    now += 750; await app.clock.run(750);
+    assert.equal(clock.firstChild.textContent, '12:30:11');
+    app.click('#settingsBtn'); row(app, 'dateFormat').focus(); app.key(37); save(app);
+    assert.equal(clock.firstChild.textContent, '12:30 PM');
+    assert.ok([...app.clock.pending.values()].some(timer => timer.delay === 49000));
+    now += 1000; await app.clock.run(1000);
+    assert.equal(clock.firstChild.textContent, '12:30 PM');
 });

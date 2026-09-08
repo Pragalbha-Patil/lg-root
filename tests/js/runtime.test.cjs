@@ -2,9 +2,9 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { browser, service, watcher } = require('./helpers.cjs');
 
-test('launcher starts with a fallback and replaces it with live tiles', t => {
+test('launcher starts empty and fills its rows with live tiles', t => {
     const app = browser(); t.after(() => app.close());
-    assert.ok(app.document.querySelector('#grid .tile'));
+    assert.equal(app.document.querySelector('#grid .tile'), null);
     app.tiles({ tiles: [{ id: 'video', title: 'Video' }] }); app.prefs();
     assert.equal(app.document.querySelector('#grid .tile').dataset.id, 'video');
     assert.ok(app.document.querySelector('[data-id="__LGHOME__"]'));

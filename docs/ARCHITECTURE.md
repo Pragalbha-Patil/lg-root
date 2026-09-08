@@ -3,9 +3,11 @@
 ## Build and runtime boundaries
 
 `build_launcher.py` runs on the contributor's computer. It reads
-`launcher-app/config.json` and a sample `tiles.json`, classifies apps and inputs,
-and renders an immediately usable fallback page. The TV does not run Python to
-start the launcher.
+`launcher-app/config.json` and renders a loading state. Apps, inputs, and system
+app tiles appear only after the TV returns live launch points. Failed discovery retries a bounded number
+of times before showing a Retry control. LG Home remains a launcher-provided bypass
+action after discovery. Refresh failures preserve the last successfully fetched
+tiles. The TV does not run Python to start the launcher.
 
 The web app (`org.minimal.home`) runs in a webOS webview. It calls the Node relay
 (`org.minimal.home.service`) over Luna for live tiles, launches, preferences,
@@ -20,13 +22,16 @@ when stock Home appears, provisions icons, and samples system statistics.
 | `launcher-app/src/` + `launcher-service/model.js` | Self-contained `launcher-app/index.html`, assembled by `build_launcher.py` |
 | `launcher-app/config.json` | Generated `launcher-service/config.json` |
 | Config version | `appinfo.json` version and embedded build string |
-| `launcher-app/tiles.json` | Static fallback tiles |
-| Explicit `--usage PATH` | Optional personal fallback ordering |
+| `launcher-app/tiles.json` | Sample tiles for explicit `--preview` builds only |
+| Explicit `--preview --usage PATH` | Optional personal preview ordering |
 | `launcher-service/constants.js` | Shared service/watcher IDs and paths |
 
 The generated page and service config are committed. The manifest is maintained
 directly except for its generated version. `python build_launcher.py --check`
-reports drift without writing files. Default builds ignore local usage snapshots.
+reports drift without writing files. Default builds read neither sample tiles nor
+local usage snapshots. Use
+`python build_launcher.py --preview` for a desktop sample, and restore the default
+build with `python build_launcher.py` before committing or packaging.
 
 ## Runtime responsibilities
 
@@ -42,10 +47,21 @@ reports drift without writing files. Default builds ignore local usage snapshots
 
 Home detection is event-driven. Other watcher work is periodic: icons refresh
 every five minutes and system statistics are sampled every five seconds when
-enabled. The watcher is not a zero-work idle process. Redirect cooldowns schedule a
-retry; reconnections discard stale stream data and timers. Icons are size-checked
+enabled. The watcher is not a zero-work idle process. Repeated Home notifications
+retain a redirect cooldown, but a confirmed transition to another app clears it
+so the next return to Home redirects immediately. Failed launches retain bounded
+backoff. Reconnections discard stale stream data and timers. Icons are size-checked
 before reading and identical bytes are not rewritten. Luna requests have deadlines
-and completion guards; the frontend retains only pending requests.
+and completion guards; the frontend retains only pending requests. Unchanged live
+tile results preserve existing DOM nodes, icon fallbacks, and focus rather than
+rebuilding the rows. The normal startup/foreground request uses the preferences
+bundled with `getTiles`, applying them before rendering; `getPrefs` is a
+compatibility fallback for responses without preferences. Responses requested
+before or during a local preference save cannot replace the local edits.
+
+The frontend clock schedules one update at the next minute boundary, or second
+boundary for formats showing seconds. It stops while backgrounded, updates on
+foreground return, and leaves unchanged clock markup intact.
 
 ## Persistence
 
@@ -72,12 +88,17 @@ These constraints come from project device observations, including webOS
 - The dev-mode service jailer cannot reliably read files in the app directory.
   The generated service-local config is intentional.
 - Background webviews can be purged after a short delay. Refresh on foreground
-  return; do not assume in-memory state survived another app.
+  return and webOS relaunch events; do not assume in-memory state survived another
+  app.
 - On webOS 10.3.1, a focused foreground webview can still report
   `document.hidden === true`. Background work checks also use `document.hasFocus()`
   so this stale visibility flag does not prevent live tiles or statistics.
 - `disableBackHistoryAPI: true` lets the app handle Back rather than delegating
   it to a platform exit/history dialog.
+- The physical Exit button is handled by the platform without delivering an app
+  event, according to [LG support](https://forum.webostv.developer.lge.com/t/lgtv-remote-controller-exit-button-behavior/9272).
+  The frontend cannot cancel it. Recovery depends on the root watcher seeing stock
+  Home become foreground; the intentional LG Home bypass still takes precedence.
 - Input tiles come from launch points and bookmark metadata. Preserve
   `PhysicalAddress`/`value` and other allowed per-port parameters, while
   preventing bookmark `params.id` from replacing the target app ID.
@@ -86,8 +107,8 @@ These constraints come from project device observations, including webOS
 - Changed files do not necessarily replace already-running webview, relay, or
   watcher processes. See [installation](INSTALL.md) for verification.
 
-The input classifier exists in Python and JavaScript because both the static
-fallback and live tiles need it. Keep their behavior aligned through regression
+The input classifier exists in Python and JavaScript because both the optional
+desktop preview and live tiles need it. Keep their behavior aligned through regression
 tests when changing classification.
 
 ## Test boundary

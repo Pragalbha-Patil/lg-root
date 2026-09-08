@@ -17,7 +17,7 @@ inputs, and a clock on a dark background, with navigation designed for a TV remo
 - D-pad navigation, per-tile menus with Menu/Info or a long press of OK, and Back handling.
 - Foreground-event redirects from LG Home, with a ten-minute bypass via the LG Home tile.
 - Optional CPU, memory, and temperature readings, where the TV exposes them.
-- A generated fallback screen that renders before the relay service responds.
+- A loading indicator while the TV discovers apps, inputs, and system tiles.
 
 ## Get started
 
@@ -38,10 +38,12 @@ python build_launcher.py
 python tools/check.py
 ```
 
-For a desktop preview, run `python -m http.server 8000 --bind 127.0.0.1` and open
+For a desktop preview, first run `python build_launcher.py --preview`, then
+`python -m http.server 8000 --bind 127.0.0.1` and open
 `http://127.0.0.1:8000/launcher-app/`. The grid and navigation work with the
-fallback tiles; app launches and TV settings require Luna on a TV. Some icons
-will be missing until the on-device watcher provisions them.
+sample tiles; app launches and TV settings require Luna on a TV. Some icons
+will be missing until the on-device watcher provisions them. Restore the normal
+build with `python build_launcher.py` before committing or packaging.
 
 For an already registered installation, use a POSIX shell (Git Bash or WSL on Windows):
 
@@ -68,7 +70,7 @@ release archives include their own installation guide and checksum.
 | Temporarily return to stock Home | LG Home tile |
 
 The [configuration guide](docs/CONFIGURATION.md) covers greetings, app priorities,
-system tiles, persistent preferences, and personal fallback builds.
+system tiles, persistent preferences, and personal preview builds.
 
 ## Screenshots
 
@@ -91,7 +93,7 @@ flowchart LR
 | Location | Purpose |
 | --- | --- |
 | `launcher-app/src/` | Frontend HTML template, CSS, and JavaScript sources |
-| `build_launcher.py` | Assembles sources and public fallback tiles into one page |
+| `build_launcher.py` | Assembles sources into a page that loads live TV tiles |
 | `launcher-app/config.json` | Source configuration and version |
 | `launcher-app/index.html` | Committed generated page; edit sources and rebuild |
 | `launcher-service/` | Luna relay, watcher, shared validation, storage, and stream parser |

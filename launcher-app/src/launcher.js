@@ -136,7 +136,10 @@
   window.__mhTiles = __mhTiles;
   var __mhInputs = [];
   var tilesLoaded = false;
+  var renderedTiles = "";
   var PREFS = M.preferences();
+  var clockTimer = null,
+    clockHTML = "";
   var prefsRevision = 0;
   var prefsSaving = false,
     prefsCompletion = null;
@@ -265,13 +268,22 @@
     );
   }
   function tick() {
+    clearTimeout(clockTimer);
+    clockTimer = null;
+    if (isBackground()) return;
     var n = new Date();
     var fmt = PREFS.dateFormat || "HH:mm";
-    document.getElementById("clock").innerHTML =
+    var html =
       esc(formatDate(n, fmt)) +
       "<small>" +
       formatDate(n, "ddd D MMM") +
       "</small>";
+    if (html !== clockHTML) {
+      document.getElementById("clock").innerHTML = html;
+      clockHTML = html;
+    }
+    var interval = fmt.indexOf("s") >= 0 ? 1000 : 60000;
+    clockTimer = setTimeout(tick, interval - (n.getTime() % interval));
   }
   function applyPrefs() {
     var b = document.body;
@@ -312,7 +324,11 @@
       wanted = localStorage.getItem("mh.focus");
     } catch (e) {}
     el = wanted ? tile4(wanted) : null;
-    el = el || document.querySelector("#grid .tile");
+    el =
+      el ||
+      document.querySelector("#grid .tile") ||
+      document.querySelector("#inputs .tile") ||
+      document.querySelector("#sysrow .tile");
     try {
       if (el) el.focus();
     } catch (e) {}
@@ -339,6 +355,8 @@
     if (Array.isArray(tiles)) __mhTiles = validTiles(tiles);
     if (Array.isArray(liveInputs)) __mhInputs = validTiles(liveInputs);
     tilesLoaded = true;
+    document.getElementById("retryTiles").className = "";
+    document.getElementById("tileStatus").style.display = "none";
     window.__mhTiles = __mhTiles;
     var grid = document.getElementById("grid");
     var inputs = document.getElementById("inputs");
@@ -358,23 +376,12 @@
       if (PREFS.hidden.indexOf(t.id) >= 0) return;
       list.inputs.push(t);
     });
-    var hasSettings = false;
-    if (SETTINGS_TILE) {
-      list.sys.forEach(function (t) {
-        if (t.id === SETTINGS_TILE.id) hasSettings = true;
-      });
-      if (PREFS.hidden.indexOf(SETTINGS_TILE.id) < 0 && !hasSettings)
-        list.sys.push(SETTINGS_TILE);
-    }
     list.sys.push({
       id: "__LGHOME__",
       title: "LG Home",
       icon: "",
       params: null
     });
-    grid.innerHTML = "";
-    inputs.innerHTML = "";
-    sysrow.innerHTML = "";
     function reorder(arr) {
       if (PREFS.sort === "alpha") return arr.slice().sort(M.compareTitle);
       var pins = [],
@@ -388,16 +395,26 @@
       });
       return pins.concat(rest);
     }
-    reorder(list.grid).forEach(function (t) {
+    list.grid = reorder(list.grid);
+    list.inputs = reorder(list.inputs);
+    list.sys = reorder(list.sys);
+    // Preserve DOM nodes, decoded icons and focus when discovery is unchanged.
+    var signature = JSON.stringify(list);
+    if (signature === renderedTiles) return;
+    renderedTiles = signature;
+    grid.innerHTML = "";
+    inputs.innerHTML = "";
+    sysrow.innerHTML = "";
+    list.grid.forEach(function (t) {
       grid.appendChild(tileEl(t));
     });
-    reorder(list.inputs).forEach(function (t) {
+    list.inputs.forEach(function (t) {
       inputs.appendChild(tileEl(t));
     });
-    reorder(list.sys).forEach(function (t) {
+    list.sys.forEach(function (t) {
       sysrow.appendChild(tileEl(t));
     });
-    restoreFocus();
+    if (!overlay.mode) restoreFocus();
   }
   function tileEl(t) {
     var d = document.createElement("div");
@@ -441,6 +458,11 @@
     return d;
   }
   function doLaunch(el) {
+    if (el.id === "retryTiles") {
+      tries = 0;
+      refresh();
+      return;
+    }
     var id = el.getAttribute("data-id");
     if (SETTINGS_TILE && id === SETTINGS_TILE.id) {
       openSettingsPanel();
@@ -695,26 +717,23 @@
       refresh();
     });
   }
+  function acceptPrefs(prefs, revision) {
+    if (prefsSaving || revision !== prefsRevision || !M.record(prefs)) return;
+    var update = M.cleanPrefs(prefs);
+    Object.keys(update).forEach(function (key) {
+      PREFS[key] = update[key];
+    });
+    applyPrefs();
+  }
   function loadPrefs() {
-    // A foreground reload must not read the old disk state during a local save.
-    if (prefsSaving) return;
+    // Compatibility fallback for a relay that does not bundle preferences.
     var revision = prefsRevision;
     svcCall(
       SVC,
       SVC_PREFS_GET_M,
       {},
       function (response) {
-        if (
-          revision !== prefsRevision ||
-          !response ||
-          !M.record(response.prefs)
-        )
-          return;
-        var update = M.cleanPrefs(response.prefs);
-        Object.keys(update).forEach(function (key) {
-          PREFS[key] = update[key];
-        });
-        applyPrefs();
+        acceptPrefs(response && response.prefs, revision);
         if (tilesLoaded) rebuild(__mhTiles, __mhInputs);
       },
       function () {}
@@ -1280,11 +1299,7 @@
     activateRow(t);
   });
 
-  function tickInterval() {
-    return 1000;
-  }
   tick();
-  setInterval(tick, tickInterval());
   var tries = 0,
     refreshRetry = null,
     refreshing = false;
@@ -1304,12 +1319,35 @@
       document.title = String(h.brand);
     }
   }
+  function tilesFailed() {
+    refreshing = false;
+    if (tries < 6) {
+      refreshRetry = setTimeout(refresh, 2500);
+    } else if (!tilesLoaded) {
+      document.getElementById("tileSpinner").style.display = "none";
+      document.getElementById("tileStatusText").textContent =
+        "Could not load apps, inputs and system from TV.";
+      document.getElementById("retryTiles").style.display = "block";
+      document.getElementById("retryTiles").className = "tile";
+    }
+  }
+  document.getElementById("retryTiles").addEventListener("click", function () {
+    doLaunch(this);
+  });
   function refresh() {
     if (refreshing || isBackground()) return;
     clearTimeout(refreshRetry);
     refreshRetry = null;
     refreshing = true;
+    if (!tilesLoaded) {
+      document.getElementById("tileSpinner").style.display = "block";
+      document.getElementById("tileStatusText").textContent =
+        "Loading apps, inputs and system from TV...";
+      document.getElementById("retryTiles").style.display = "none";
+      document.getElementById("retryTiles").className = "";
+    }
     tries++;
+    var revision = prefsSaving ? null : prefsRevision;
     svcCall(
       SVC,
       SVC_LIST_M,
@@ -1326,37 +1364,35 @@
           // a served grid means the retry budget is spent cleanly (no stale
           // tries leak into the next burst after a long foreground session)
           tries = 0;
+          // Apply the same snapshot before rendering; never replace local edits
+          // with a response requested before or during their save.
+          if (M.record(d.prefs)) acceptPrefs(d.prefs, revision);
+          else if (!prefsSaving && revision === prefsRevision) loadPrefs();
           rebuild(d.tiles, d.inputs);
-        } else if (tries < 6) {
-          refreshRetry = setTimeout(refresh, 2500);
+        } else {
+          tilesFailed();
         }
       },
-      function () {
-        refreshing = false;
-        if (tries < 6) {
-          refreshRetry = setTimeout(refresh, 2500);
-        }
-      }
+      tilesFailed
     );
   }
   var refreshTimer = null;
   function requestRefresh() {
     // WAM fires visibilitychange and focus back-to-back on every foreground;
     // coalesce both into one getTiles round-trip.
-    if (refreshTimer !== null) return;
+    if (isBackground() || refreshTimer !== null) return;
     refreshTimer = setTimeout(function () {
       refreshTimer = null;
     }, 400);
     refresh();
   }
   refresh();
-  loadPrefs();
   restoreFocus();
   document.addEventListener("visibilitychange", function () {
+    tick();
     if (!isBackground()) {
       tries = 0;
       requestRefresh();
-      loadPrefs();
     } else {
       stopHold();
       clearTimeout(enterHoldTimer);
@@ -1366,7 +1402,13 @@
       refreshRetry = null;
     }
   });
+  document.addEventListener("webOSRelaunch", function () {
+    tick();
+    tries = 0;
+    requestRefresh();
+  });
   window.addEventListener("focus", function () {
+    tick();
     tries = 0;
     requestRefresh();
   });

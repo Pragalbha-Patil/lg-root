@@ -396,3 +396,32 @@ h1 b {
   font-size: 14px;
   color: #5f6b7d;
 }
+
+#tileStatus {
+  align-items: center;
+  gap: 20px;
+  padding: 24px 0;
+  font-size: 24px;
+  color: #c3ccd8;
+}
+#tileSpinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: tile-spin 1s linear infinite;
+}
+#retryTiles {
+  padding: 12px 24px;
+}
+@keyframes tile-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #tileSpinner {
+    animation: none;
+  }
+}

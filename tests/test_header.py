@@ -8,23 +8,15 @@ class HeaderRegressionTest(unittest.TestCase):
     def run_js(self, script):
         subprocess.run(['node', '-e', script], check=True, timeout=30)
 
-    def test_date_names_and_single_clock_timer(self):
+    def test_date_names(self):
         page = bl.build()[0]['launcher-app/index.html']
-        formatter = page[page.index('function formatDate('):page.index('function applyPrefs(')]
-        timer = page[page.index('function tickInterval('):page.index('var tries =')]
+        formatter = page[page.index('function formatDate('):page.index('function tick(')]
         self.run_js('const assert=require("assert");' + formatter + '''
 const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 months.forEach((m,i)=>assert.equal(formatDate(new Date(2026,i,9,15,4,5),'MMM D, h:mm:ss A'),m+' 9, 3:04:05 PM'));
 assert.equal(formatDate(new Date(2026,8,9),'ddd D MMM'),'Wed 9 Sep');
 assert.equal(formatDate(new Date(2026,8,9),'dddd D MMMM'),'Wednesday 9 September');
 assert.equal(formatDate(new Date(2026,8,9),'ddd ddd'),'Wed Wed');
-let timers=[], ticks=0;
-tick=function(){ticks++};
-function setInterval(fn){timers.push(fn);}
-''' + timer + '''
-for(let i=0;i<100;i++) timers[0]();
-assert.equal(timers.length,1);
-assert.equal(ticks,101);
 ''')
 
     def test_all_clock_formats_across_calendar_and_time_boundaries(self):

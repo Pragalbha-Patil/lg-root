@@ -266,7 +266,7 @@ async function redirectLoop() {
         const r = await lunaLaunch(SELF_ID);
         if (r && r.returnValue) {
             fails = 0;
-            lastRedirect = Date.now();
+            lastRedirect = foregroundApp === HOME_ID ? Date.now() : 0;
             log({ redirect: true });
         } else {
             if (foregroundApp !== HOME_ID) return;
@@ -287,6 +287,9 @@ async function redirectLoop() {
 
 async function onForeground(appId) {
     foregroundApp = appId;
+    // A confirmed transition ends the previous Home redirect burst. Exit or
+    // Home from a running app must not inherit its eight-second cooldown.
+    if (appId && appId !== HOME_ID) lastRedirect = 0;
     if (appId !== HOME_ID && retryTimer !== null) {
         clearTimeout(retryTimer);
         retryTimer = null;
