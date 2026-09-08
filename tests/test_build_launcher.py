@@ -8,9 +8,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), os.p
 import build_launcher as bl
 
 
-def make_lp(lp_id, title, system=False, icon=None, params=None):
+def make_lp(lp_id, title, system=False, icon=None, params=None, lptype=None):
     return {"id": lp_id, "title": title, "systemApp": system,
-            "hidden": False, "icon": icon or "", "largeIcon": "", "params": params}
+            "hidden": False, "icon": icon or "", "largeIcon": "", "params": params,
+            "lptype": lptype or ("default" if system else "app")}
 
 
 SAMPLE = [
@@ -28,8 +29,6 @@ class ClassifyTest(unittest.TestCase):
     def setUp(self):
         self.cfg = {
             "ui": {
-                "inputs": ["com.webos.app.livetv", "com.webos.app.hdmi1",
-                           "com.webos.app.hdmi2", "com.webos.app.hdmi3", "com.webos.app.hdmi4"],
                 "system": ["com.webos.app.discovery", "com.webos.app.mediadiscovery",
                            "com.palm.app.settings"],
                 "appsPriority": ["youtube.leanback.v4", "netflix"],
@@ -74,6 +73,26 @@ class ClassifyTest(unittest.TestCase):
         lp = SAMPLE + [make_lp("com.webos.app.othersys", "Other", system=True)]
         _, _, sysrow = bl.classify(lp, self.cfg)
         self.assertNotIn("com.webos.app.othersys", [t["id"] for t in sysrow])
+
+    def test_inputs_from_system_not_config_list(self):
+        # No hardcoded input allowlist: any port launch point the system
+        # reports is an input -- a device plugged back in later appears
+        # automatically (here hdmi2/PS5 bookmark is absent from cfg).
+        lp = SAMPLE + [make_lp("com.webos.app.hdmi2", "PlayStation 5",
+                               lptype="bookmark", params={"PhysicalAddress": "2000", "value": "4"})]
+        apps, inputs, _ = bl.classify(lp, self.cfg)
+        ids = [t["id"] for t in inputs]
+        self.assertIn("com.webos.app.hdmi2", ids)
+        self.assertIn("com.webos.app.livetv", ids)
+        self.assertNotIn("com.webos.app.hdmi2", [t["id"] for t in apps])
+        loaded = json.loads(json.dumps(lp))
+        t = next(t for t in inputs if t["id"] == "com.webos.app.hdmi2")
+        self.assertEqual(t["params"], loaded[-1]["params"])
+
+    def test_input_params_kept(self):
+        _, inputs, _ = bl.classify(SAMPLE, self.cfg)
+        t = next(t for t in inputs if t["id"] == "com.webos.app.hdmi1")
+        self.assertEqual(t["params"], {"PhysicalAddress": "1000"})
 
 
 class SortTest(unittest.TestCase):
@@ -127,6 +146,48 @@ class TemplateTest(unittest.TestCase):
         self.assertIn("icons/com.palm.app.settings.png", out["launcher-app/index.html"])
         self.assertNotIn("/usr/palm/applications/com.palm.app.settings/icon.png",
                          out["launcher-app/index.html"])
+
+
+class QolTest(unittest.TestCase):
+    def test_prefs_ui_constants(self):
+        out, _, _ = bl.build()
+        html = out["launcher-app/index.html"]
+        self.assertIn('var SVC_PREFS_GET_M = "getPrefs"', html)
+        self.assertIn('var SVC_PREFS_SET_M = "setPrefs"', html)
+        self.assertIn("getPrefs", html)
+        self.assertIn("setPrefs", html)
+
+    def test_overlay_markup_present(self):
+        out, _, _ = bl.build()
+        html = out["launcher-app/index.html"]
+        for marker in ["id=\"dim\"", "id=\"settingsPanel\"", "id=\"optionsPanel\"",
+                       "id=\"searchBox\"", "id=\"settingsRows\"", "id=\"optionsRows\"",
+                       "id=\"searchQ\"", "id=\"searchRows\""]:
+            self.assertIn(marker, html)
+
+    def test_prefs_state_and_interaction(self):
+        out, _, _ = bl.build()
+        html = out["launcher-app/index.html"]
+        self.assertIn("var PREFS = {", html)
+        self.assertIn("density-compact", html)
+        self.assertIn("density-large", html)
+        self.assertIn("no-labels", html)
+        self.assertIn("--accent", html)
+        self.assertIn(".pin", html)
+        self.assertIn("openOptions", html)
+        self.assertIn("openSettingsPanel", html)
+        self.assertIn("openSearch", html)
+        self.assertIn("localStorage", html)
+
+    def test_service_prefs_api_wired(self):
+        out, _, _ = bl.build()
+        html = out["launcher-app/index.html"]
+        self.assertIn("loadPrefs()", html)
+        self.assertIn("commitPrefs", html)
+        self.assertIn("PREFS.hidden", html)
+        self.assertIn("PREFS.pinned", html)
+        self.assertIn("PREFS.accent", html)
+        self.assertIn("PREFS.sort", html)
 
 
 class UsageTest(unittest.TestCase):

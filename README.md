@@ -14,7 +14,10 @@ No recommendations rows. No promotional tiles. No carousel of content you will n
   - Then a curated priority list, then the rest alphabetically
 - **Live tile refresh** — app list re-fetches from the TV when the launcher regains focus, so
   newly installed apps appear without a rebuild
-- **Remote-friendly** — full D-pad spatial navigation, auto-focus on boot
+- **Remote-friendly** — full D-pad spatial navigation, auto-focus on boot, arrow-repeat and
+  row-wrapping, plus a letters-search overlay (press any letter, keep typing to filter)
+- **Per-app options** — press **Menu/Info** (or hold **OK**) on a tile to **pin/unpin**, **hide**,
+  or launch it; hidden apps are restored from the Settings panel
 - **No polling watcher** — an event-driven service reacts instantly to foreground changes and
   redirects stock LG Home to Minimal Home
 - **Built-in bypass** — an "LG Home" tile lets you temporarily reach the stock launcher
@@ -65,6 +68,31 @@ and generates `launcher-app/index.html`. The generated page is the app's entry p
 ```sh
 luna-send -n 1 luna://com.webos.applicationManager/listLaunchPoints '{}'
 ```
+
+### On-launcher settings panel
+
+Press the **⚙ Settings** tile (or the gear in the header) to open the in-launcher settings panel.
+Preference changes persist to disk on the TV and survive relaunches:
+
+| Row | What it does |
+| --- | --- |
+| **Accent color** | Cycles the highlight color (steel / emerald / violet / amber / crimson) with Left/Right |
+| **Tile size** | Compact / standard / large grid density |
+| **App labels** | Shows or hides the text under each icon |
+| **Clock** | 12-hour or 24-hour time display |
+| **Sort order** | Most used / alphabetical / pinned-first ordering of the tile grid |
+| **Hidden apps** | Lists hidden apps; select one to restore it to the grid |
+| **Reset all** | Restores every preference to its default |
+
+Use **Left/Right** on a row to cycle its value and **OK** to toggle; **Back** returns to the grid.
+
+### Pinning, hiding and search
+
+- **Pin / Unpin** and **Hide app** live in a per-tile menu — press **Menu** or **Info** (key 412/457),
+  or hold **OK** for a moment on the tile you want. Pinned apps jump to the front of their row with
+  a ★ badge; hidden apps are removed from the grid (restore them under Settings → Hidden apps).
+- **Search** — start typing any letter to open the search overlay and filter the grid live;
+  press **Backspace** to edit the query and **OK** to launch the top match.
 
 ## Install on the TV
 
@@ -128,20 +156,21 @@ setsid node /media/developer/apps/usr/palm/services/org.minimal.home.service/wat
 
 ### System app allowlist — `launcher-app/config.json`
 
-Only these system (non-third-party) apps are exposed as tiles. Everything else from the TV
-(apps you installed, HDMI bookmarks) is shown automatically. `launcher-service/service.js` loads
-this from the **same** `config.json` the build uses, so the live tile list and the baked page
-can't drift:
+Inputs are **not configured here**: the TV publishes a launch point for every connected input
+(HDMI/AV/DP ports show up automatically, disappear when unplugged, and reappear if you plug a
+device back in), and the service classifies those launch points as the **Inputs** row. Only the
+non-third-party system apps you want exposed as tiles — and the Settings tile — are listed here.
+`launcher-service/service.js` loads this from the **same** `config.json` the build uses, so the
+live tile list and the baked page can't drift:
 
 ```json
 "ui": {
-  "inputs": ["com.webos.app.livetv", "com.webos.app.hdmi1", "com.webos.app.hdmi2", "com.webos.app.hdmi3", "com.webos.app.hdmi4"],
   "system": ["com.webos.app.discovery", "com.webos.app.mediadiscovery", "com.palm.app.settings"]
 }
 ```
 
-Add a `com.webos.app.*` id to `inputs` or `system` if you want a particular system app to appear
-as a tile. `inputs` row order follows the array, `system` lets the Settings tile be optional.
+Add a `com.webos.app.*` id to `system` if you want a particular system app to appear as a tile;
+that list also lets the Settings tile be optional.
 
 ### Icons
 
@@ -161,7 +190,13 @@ so the static page matches the live list.
 
 ## Screenshots
 
-![Minimal Home](docs/screenshots/home.png)
+|          Minimal Home          |           Settings            |
+| :---------------------------: | :---------------------------: |
+| ![Minimal Home](docs/screenshots/home.png) | ![Settings](docs/screenshots/settings.png) |
+
+|          Per-app options       |           Search              |
+| :---------------------------: | :---------------------------: |
+| ![Options](docs/screenshots/options.png) | ![Search](docs/screenshots/search.png) |
 
 Re-capture with the CDP helper (TV DevTools Server must be running on port
 9998 — same one `webOS Dev Manager` exposes in developer mode):
@@ -189,7 +224,7 @@ flowchart TB
 
     subgraph tv["webOS TV"]
         app["org.minimal.home (web app)<br/>index.html + spatial-nav.js"]
-        svc["org.minimal.home.service (Node)<br/>getTiles · launchApp · openLGHome"]
+        svc["org.minimal.home.service (Node)<br/>getTiles · launchApp · get/setPrefs"]
         watch["watcher.js<br/>(event-driven, no polling)"]
         icons["icons/&lt;id&gt;.png — app-local icon copies"]
         lps["installed apps (launch points)"]
@@ -200,6 +235,7 @@ flowchart TB
     baked -->|scp / tools/install.sh| app
 
     app -->|getTiles: live tile list + MRU| svc
+app -->|getPrefs/setPrefs: settings, pins, hidden| svc
     app -->|launchApp: intercept + record MRU| svc
     app -->|openLGHome: bypass for 10 min| svc
     app -->|img src = relative path| icons
@@ -228,9 +264,9 @@ lg-root/
 ├── build_launcher.py        # build-time generator for the launcher page
 ├── launcher-app/            # the webOS web app (what runs on screen)
 │   ├── appinfo.json         # webOS app manifest
-│   ├── config.json          # header greeting config
+│   ├── config.json          # header greeting + UI config
 │   ├── tiles.json           # sample launch-point snapshot for local builds
-│   ├── spatial-nav.js       # shared D-pad / spatial navigation helper
+│   ├── spatial-nav.js       # (deprecated) replaced by the baked-in launcher logic
 │   └── index.html           # GENERATED by build_launcher.py (app entry point)
 ├── launcher-service/        # the Node relay service + redirect watcher
 │   ├── service.js           # getTiles / launchApp / openLGHome + MRU persistence

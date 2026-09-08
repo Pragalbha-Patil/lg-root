@@ -14,6 +14,7 @@ var SVC_DIR = '/media/developer/apps/usr/palm/services/' + SELF_ID + '.service';
 var CONFIG_FILE = APP_DIR + '/config.json';
 var BYPASS_FILE = SVC_DIR + '/.noredirect';
 var USAGE_FILE = SVC_DIR + '/usage.json';
+var PREFS_FILE = SVC_DIR + '/prefs.json';
 var WATCH_LOG = '/tmp/minhome-watch.log';
 var SVC_LOG = '/tmp/minhome-svc.log';
 
@@ -28,6 +29,7 @@ module.exports = {
   CONFIG_FILE: CONFIG_FILE,
   BYPASS_FILE: BYPASS_FILE,
   USAGE_FILE: USAGE_FILE,
+  PREFS_FILE: PREFS_FILE,
   WATCH_LOG: WATCH_LOG,
   SVC_LOG: SVC_LOG
 };

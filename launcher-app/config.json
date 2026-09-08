@@ -1,17 +1,10 @@
 {
-    "version": "1.0.3",
+    "version": "1.1.0",
     "header": {
         "text": "Welcome",
         "brand": "Minimal Home"
     },
     "ui": {
-        "inputs": [
-            "com.webos.app.livetv",
-            "com.webos.app.hdmi1",
-            "com.webos.app.hdmi2",
-            "com.webos.app.hdmi3",
-            "com.webos.app.hdmi4"
-        ],
         "system": [
             "com.webos.app.discovery",
             "com.webos.app.mediadiscovery",
