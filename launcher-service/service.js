@@ -153,6 +153,13 @@ register('getTiles', function (payload, reply) {
             tiles: M.sortTiles(tiles, prefs, usage, priority),
             inputs: M.sortTiles(inputs, prefs, usage, []),
             prefs: prefs,
+            config: {
+                system: allowed,
+                settingsTile:
+                    allowed.indexOf(C.SETTINGS_ID) >= 0
+                        ? { id: C.SETTINGS_ID }
+                        : null
+            },
             header: {
                 text: typeof header.text === 'string' ? header.text : '',
                 brand: typeof header.brand === 'string' ? header.brand : ''

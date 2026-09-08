@@ -15,6 +15,24 @@ function save(app) {
 function ids(app, section) { return [...app.document.querySelectorAll('#' + section + ' .tile')].map(el => el.dataset.id); }
 function row(app, key) { return app.document.querySelector('#settingsRows [data-key="' + key + '"]'); }
 
+test('live config replaces embedded system rows and Settings behavior on startup and relaunch', t => {
+    const app = appFor(t, { settings: false });
+    const settings = { id: C.SETTINGS_ID, title: 'Settings' };
+    const config = { system: [video.id, settings.id], settingsTile: { id: settings.id } };
+    ready(app, { tiles: [video, settings], config });
+    assert.deepEqual(ids(app, 'grid'), []);
+    assert.deepEqual(ids(app, 'sysrow'), [video.id, settings.id, '__LGHOME__']);
+    app.click('[data-id="' + settings.id + '"]');
+    assert.ok(row(app, 'tvsettings'));
+    app.click('#settingsRows [data-key="tvsettings"]');
+    assert.equal(app.calls.find(c => c.method === 'launchApp').parameters.id, settings.id);
+
+    app.document.dispatchEvent(new app.window.Event('webOSRelaunch'));
+    ready(app, { config: { system: [], settingsTile: null } });
+    assert.deepEqual(ids(app, 'grid'), [video.id]);
+    assert.deepEqual(ids(app, 'sysrow'), ['__LGHOME__']);
+});
+
 test('bundled and legacy preferences preserve inputs and sorting', t => {
     for (const order of ['bundled', 'legacy']) for (const size of ['compact', 'standard', 'large']) {
         for (const sort of ['mru', 'alpha', 'pinned']) {

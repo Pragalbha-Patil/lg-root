@@ -1,6 +1,6 @@
 # Configuration
 
-## Build configuration
+## Source configuration
 
 Edit `launcher-app/config.json`, then run `python build_launcher.py` and deploy
 both app and service files. The generated service-local copy is necessary
@@ -33,6 +33,38 @@ Inputs are discovered from the TV's launch points. Do not add a fixed HDMI list
 to config. The system allowlist is explicit: an empty list hides all system
 apps, including the Settings tile. The header gear still opens launcher preferences,
 and the LG Home bypass tile remains available.
+
+## On-TV configuration
+
+The runtime file is
+`/media/developer/apps/usr/palm/services/org.minimal.home.service/config.json`.
+The relay rereads it for every `getTiles` request, including startup, return to
+foreground, and relaunch. The frontend applies the greeting, system-row IDs,
+and Settings action from that response; app priority sorting happens in the relay.
+This works on the next TV boot without rebuilding. Editing the app directory's
+copy has no runtime effect.
+
+Follow the [README commands](../README.md#change-configuration-on-the-tv) to edit
+and refresh while the TV is running. A direct `getTiles` call can inspect the
+configuration response but does not itself refresh the visible page. No continuous
+config polling is performed.
+
+Use strings for both header fields and arrays of app ID strings for both `ui`
+fields. Retain all fields when editing: runtime reads do not merge build defaults.
+An empty `ui.system` hides system apps, including the Settings tile, while the
+header gear and LG Home bypass remain available. IDs only expose apps returned
+by live discovery. `ui.appsPriority` breaks ordering ties after pins and recent
+usage; alphabetical sorting ignores it.
+
+`version` remains build metadata: changing it on the TV does not update the
+installed manifest or displayed build version. Appearance and clock options
+belong to launcher preferences below.
+
+The initial feature installation needs updated app and relay files and a restart
+of their existing processes; subsequent config edits do not. Uploading a build
+or release overwrites the service config, so keep a backup of TV customizations
+and reapply them afterward. Invalid JSON or invalid field types can leave the
+greeting blank or system apps hidden; restore the backup and refresh if needed.
 
 ## Launcher preferences
 
