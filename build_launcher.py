@@ -311,6 +311,8 @@ var SVC_LGHOME_M = "openLGHome";
 var SVC_STATS_M = "getSystemStats";
 
 var __mhTiles = []; window.__mhTiles = __mhTiles;
+var __mhInputs = [];
+var tilesLoaded = false;
 var PREFS = { accent: "steel", tileSize: "standard", labels: true, clock24: false, sort: "mru", pinned: [], hidden: [], showSystemStats: true, dateFormat: "HH:mm" };
 var ACCENTS = {
   steel:   { name: "Steel",   main: "#8fb6ff", soft: "rgba(143,182,255,.35)" },
@@ -383,7 +385,9 @@ function restoreFocus(){
 }
 
 function rebuild(tiles, liveInputs){
-  __mhTiles = tiles || [];
+  if (Array.isArray(tiles)) __mhTiles = tiles;
+  if (Array.isArray(liveInputs)) __mhInputs = liveInputs;
+  tilesLoaded = true;
   window.__mhTiles = __mhTiles;
   var grid = document.getElementById("grid");
   var inputs = document.getElementById("inputs");
@@ -395,7 +399,7 @@ function rebuild(tiles, liveInputs){
     if (SYS_IDS.indexOf(t.id) >= 0) { list.sys.push(t); }
     else { list.grid.push(t); }
   });
-  (liveInputs || []).forEach(function(t){
+  __mhInputs.forEach(function(t){
     if (!t || !t.id || t.id === SELF_ID) return;
     if (PREFS.hidden.indexOf(t.id) >= 0) return;
     list.inputs.push(t);
@@ -457,7 +461,7 @@ function doLaunch(el){
 function launchFromId(id){
   if (id === "__LGHOME__") { svcCall(SVC, SVC_LGHOME_M, {}, function(){}, function(){}); return; }
   var t = null;
-  __mhTiles.forEach(function(x){ if (x.id === id) t = x; });
+  __mhTiles.concat(__mhInputs).forEach(function(x){ if (x.id === id) t = x; });
   launch(id, (t && t.params) || null);
 }
 function mkInitialEl(title){
@@ -561,7 +565,7 @@ function loadPrefs(){
       if (Array.isArray(p.pinned)) PREFS.pinned = p.pinned.slice();
       if (Array.isArray(p.hidden)) PREFS.hidden = p.hidden.slice();
       applyPrefs();
-      if (__mhTiles.length) rebuild(__mhTiles);
+      if (tilesLoaded) rebuild(__mhTiles, __mhInputs);
     }
   }, function(){});
 }
@@ -608,7 +612,7 @@ function openOptions(el){
 function openManage(){
   overlay.mode = "manage";
   var hidden = [];
-  __mhTiles.forEach(function(t){ if (PREFS.hidden.indexOf(t.id) >= 0) hidden.push(t); });
+  __mhTiles.concat(__mhInputs).forEach(function(t){ if (PREFS.hidden.indexOf(t.id) >= 0) hidden.push(t); });
   var html = hidden.length ? hidden.map(function(t){
     var pin = PREFS.pinned.indexOf(t.id) >= 0 ? " \u2605" : "";
     return '<div class="optrow" tabindex="0" data-id="' + esc(t.id) + '"><span class="sl">' + (t.title || t.id) + pin + '</span><span class="small">' + t.id + '</span></div>';
@@ -646,7 +650,7 @@ function searchMatches(){
   var q = searchQ.toLowerCase();
   if (!q) return [];
   var starts = [], cont = [];
-  __mhTiles.forEach(function(t){
+  __mhTiles.concat(__mhInputs).forEach(function(t){
     if (PREFS.hidden.indexOf(t.id) >= 0) return;
     var title = (t.title || "").toLowerCase(), id = (t.id || "").toLowerCase();
     if (title.indexOf(q) === 0 || id.indexOf(q) === 0) starts.push(t);
@@ -900,7 +904,7 @@ function refresh(){
   svcCall(SVC, SVC_LIST_M, {},
     function(d){
       if (d && d.header) applyHeader(d.header);
-      if (d && d.tiles && d.tiles.length) {
+      if (d && d.returnValue === true && Array.isArray(d.tiles) && Array.isArray(d.inputs)) {
         // a served grid means the retry budget is spent cleanly (no stale
         // tries leak into the next burst after a long foreground session)
         tries = 0;

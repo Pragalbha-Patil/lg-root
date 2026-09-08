@@ -137,6 +137,10 @@ service.register('getTiles', function (msg) {
         service.call('luna://com.webos.applicationManager/listLaunchPoints', {}, function (res) {
             try {
                 var p = (res && res.payload) || {};
+                if (p.returnValue !== true || !Array.isArray(p.launchPoints)) {
+                    msg.respond({ returnValue: false, errorText: p.errorText || 'Invalid launch-point response' });
+                    return;
+                }
                 var usage = loadUsage();
                 var prefs = loadPrefs();
                 var hiddenSet = {}, pinIdx = {};
@@ -150,7 +154,7 @@ service.register('getTiles', function (msg) {
                     ? cfgUI.appsPriority : [];
                 var out = [], inputs = [];
                 (p.launchPoints || []).forEach(function (lp) {
-                    if (!lp || lp.hidden || lp.id === SELF_ID) return;
+                    if (!lp || typeof lp.id !== 'string' || !lp.id || lp.hidden || lp.id === SELF_ID) return;
                     var isInp = isInputLp(lp);
                     if (lp.systemApp && !isInp) {
                         var sysOk = (ALLOW_SYSTEM.length === 0) || (ALLOW_SYSTEM.indexOf(lp.id) >= 0);
