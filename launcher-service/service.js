@@ -131,7 +131,10 @@ service.register('getTiles', function (msg) {
                 var hiddenSet = {}, pinIdx = {};
                 prefs.hidden.forEach(function (id) { if (id) hiddenSet[id] = 1; });
                 prefs.pinned.forEach(function (id, i) { if (id && !(id in pinIdx)) pinIdx[id] = i; });
-                var cfgUI = ((loadConfig() || {}).ui) || {};
+                var cfg = loadConfig() || {};
+                var cfgUI = cfg.ui || {};
+                var cfgHeader = (cfg.header && typeof cfg.header === 'object')
+                    ? { text: cfg.header.text, brand: cfg.header.brand } : null;
                 var priority = (Object.prototype.toString.call(cfgUI.appsPriority) === '[object Array]')
                     ? cfgUI.appsPriority : [];
                 var out = [], inputs = [];
@@ -175,7 +178,7 @@ service.register('getTiles', function (msg) {
                 }
                 log({ m: 'getTiles', n: out.length, inputs: inputs.length, sort: prefs.sort, pins: prefs.pinned.length,
                       hidden: prefs.hidden.length, err: '' });
-                msg.respond({ returnValue: true, tiles: out, inputs: inputs, prefs: prefs });
+                msg.respond({ returnValue: true, tiles: out, inputs: inputs, prefs: prefs, header: cfgHeader });
             } catch (e) {
                 log({ m: 'getTiles', err: 'handler:' + (e && e.message) });
                 msg.respond({ returnValue: false, errorText: String((e && e.message) || e) });

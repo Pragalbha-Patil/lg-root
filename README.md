@@ -157,7 +157,10 @@ setsid node /media/developer/apps/usr/palm/services/org.minimal.home.service/wat
 }
 ```
 
-`text` is rendered small-and-regular, `brand` is rendered bold. Rebuild and redeploy to apply.
+`text` is rendered small-and-regular, `brand` is rendered bold. The greeting is **per-Tv** config:
+the built-in `index.html` ships a generic "Welcome Minimal Home" banner, and `getTiles` serves your
+`config.json` header at runtime so each TV reads its own name. Change `text`/`brand` in this file and
+redeploy `launcher-app/` + `launcher-service/` (no rebuild needed).
 
 ### System app allowlist — `launcher-app/config.json`
 

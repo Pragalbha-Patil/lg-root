@@ -20,7 +20,7 @@ LG_HOME_ID = "__LGHOME__"
 
 DEFAULTS = {
     "version": "1.0.0",
-    "header": {"text": "Welcome", "brand": "PSP"},
+    "header": {"text": "Welcome", "brand": "Minimal Home"},
     "ui": {
         "system": [
             "com.webos.app.discovery",
@@ -206,7 +206,7 @@ h1 b{font-weight:700}
 </head>
 <body>
 <header>
-<h1>__WELCOME_TEXT__ <b>__WELCOME_BRAND__</b></h1>
+<h1 id="headLine"><span id="headText">__WELCOME_TEXT__</span> <b id="headBrand">__WELCOME_BRAND__</b></h1>
 <div class="hright">
 <div id="settingsBtn" class="tile" tabindex="0" role="button" aria-label="Settings"><span class="gear">&#9881;</span><span>Settings</span></div>
 <div id="clock">--:--<small></small></div>
@@ -848,10 +848,19 @@ document.addEventListener("click", function(e){
 
 tick(); setInterval(tick, 15000);
 var tries = 0;
+function applyHeader(h){
+  if (!h) return;
+  if (h.text) { document.getElementById("headText").textContent = String(h.text).toUpperCase(); }
+  if (h.brand) {
+    document.getElementById("headBrand").textContent = String(h.brand);
+    document.title = String(h.brand);
+  }
+}
 function refresh(){
   tries++;
   svcCall(SVC, SVC_LIST_M, {},
     function(d){
+      if (d && d.header) applyHeader(d.header);
       if (d && d.tiles && d.tiles.length) { rebuild(d.tiles, d.inputs); }
       else if (tries < 6) { setTimeout(refresh, 2500); }
     },
@@ -879,8 +888,10 @@ def build(version=None):
     apps, inputs, sysrow = classify(load_tiles(), cfg)
     version = version or cfg.get("version") or "1.0.0"
 
-    header_text = (cfg.get("header", {}).get("text") or "Welcome").upper()
-    header_brand = cfg.get("header", {}).get("brand") or "Minimal Home"
+    # Banner is baked from DEFAULTS so committed index.html stays generic;
+    # the per-TV greeting comes from config.json at runtime (getTiles.header).
+    header_text = (DEFAULTS.get("header", {}).get("text") or "Welcome").upper()
+    header_brand = DEFAULTS.get("header", {}).get("brand") or "Minimal Home"
     sys_ids = [s for s in cfg["ui"]["system"] if s]
     settings_tile = {"id": SETTINGS_ID, "title": "Settings",
                      "icon": SETTINGS_ICON, "params": None}

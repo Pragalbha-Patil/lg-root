@@ -212,6 +212,25 @@ class QolTest(unittest.TestCase):
         self.assertIn('if (key === "close") { hideOverlay(); return; }', html)
         self.assertIn('"Close"', html)
 
+    def test_baked_banner_is_generic_not_config(self):
+        # Branding is per-TV: the committed index.html ships the generic
+        # DEFAULTS banner ("Welcome Minimal Home"), never config.json's.
+        out, _, _ = bl.build()
+        html = out["launcher-app/index.html"]
+        self.assertIn('id="headText">WELCOME</span>', html)
+        self.assertIn('id="headBrand">Minimal Home</b>', html)
+        start = html.index('<h1 id="headLine">')
+        end = html.index('</h1>', start)
+        self.assertNotIn("PSP", html[start:end])
+
+    def test_runtime_header_applied_from_gettiles(self):
+        out, _, _ = bl.build()
+        html = out["launcher-app/index.html"]
+        self.assertIn('function applyHeader(h)', html)
+        self.assertIn('if (d && d.header) applyHeader(d.header);', html)
+        self.assertIn('getElementById("headText")', html)
+        self.assertIn('getElementById("headBrand")', html)
+
 
 class UsageTest(unittest.TestCase):
     def test_usage_reads_service_path_first(self):
