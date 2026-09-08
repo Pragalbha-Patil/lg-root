@@ -212,6 +212,34 @@ class QolTest(unittest.TestCase):
         self.assertIn('if (key === "close") { hideOverlay(); return; }', html)
         self.assertIn('"Close"', html)
 
+    def test_baked_icons_are_app_relative_not_absolute(self):
+        # file:// blocks absolute icon paths (issue #17): baked tiles must use
+        # the same icons/<id>.png mechanism as the live getTiles response.
+        out, _, _ = bl.build()
+        html = out["launcher-app/index.html"]
+        self.assertIn('src="icons/youtube.leanback.v4.png"', html)
+        self.assertNotIn("/media/cryptofs/apps/", html)
+        self.assertNotIn("/usr/palm/applications/", html)
+        self.assertNotIn("assets/icon", html)
+        self.assertIn("onerror=", html)
+
+    def test_spatial_nav_polyfill_no_longer_loaded(self):
+        out, _, _ = bl.build()
+        self.assertNotIn("spatial-nav.js", out["launcher-app/index.html"])
+
+    def test_focusid_pref_removed(self):
+        out, _, _ = bl.build()
+        html = out["launcher-app/index.html"]
+        self.assertNotIn("focusId", html)
+
+    def test_refresh_resets_retry_and_coalesces_focus_events(self):
+        out, _, _ = bl.build()
+        html = out["launcher-app/index.html"]
+        self.assertIn("tries = 0;", html)
+        self.assertIn("requestRefresh()", html)
+        self.assertIn("var refreshTimer = null;", html)
+        self.assertIn("launchBusy", html)
+
     def test_baked_banner_is_generic_not_config(self):
         # Branding is per-TV: the committed index.html ships the generic
         # DEFAULTS banner ("Welcome Minimal Home"), never config.json's.

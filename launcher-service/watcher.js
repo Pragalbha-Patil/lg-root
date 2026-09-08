@@ -64,8 +64,17 @@ function provisionIcons(lps) {
             try {
                 const b = fs.readFileSync(src);
                 if (b.length && b.length <= ICON_MAX_BYTES) {
-                    fs.writeFileSync(dst, b);
-                    good = true;
+                    try {
+                        if (fs.readFileSync(dst).equals(b)) {
+                            good = true; // unchanged: skip the flash write
+                        } else {
+                            fs.writeFileSync(dst, b);
+                            good = true;
+                        }
+                    } catch (e) {
+                        fs.writeFileSync(dst, b);
+                        good = true;
+                    }
                 }
             } catch (e) { good = false; }
         }
@@ -79,7 +88,10 @@ function provisionSettingsIcon() {
     try {
         const dst = path.join(ICON_DIR, SETTINGS_ID + '.png');
         const b = fs.readFileSync(SETTINGS_ICON);
-        if (b.length && b.length <= ICON_MAX_BYTES) fs.writeFileSync(dst, b);
+        if (b.length && b.length <= ICON_MAX_BYTES) {
+            try { if (fs.readFileSync(dst).equals(b)) return; } catch (e) {}
+            fs.writeFileSync(dst, b);
+        }
     } catch (e) { log({ provErr: 'settings:' + String((e && e.code) || e) }); }
 }
 

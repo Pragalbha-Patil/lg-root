@@ -128,7 +128,12 @@ def sort_key(t, usage, priority):
 
 def tile_html(t):
     if t.get("icon"):
-        art = '<img src="%s" alt="" data-title="%s">' % (t["icon"], htmllib.escape(t["title"], quote=True))
+        # Bake the app-relative icons/<id>.png path (same mechanism the live
+        # getTiles response and the watcher use): the file:// webview blocks
+        # absolute paths, and the watcher owns every file under icons/.
+        icon = "icons/" + t["id"].replace("/", "_").replace("\\", "_") + ".png"
+        art = ('<img src="%s" alt="" data-title="%s" onerror="this.style.display=\'none\'">'
+               % (icon, htmllib.escape(t["title"], quote=True)))
     else:
         art = '<div class="initial">%s</div>' % htmllib.escape((t["title"] or "?").strip()[:1].upper())
     return ('<div class="tile" tabindex="0" role="button" data-id="%s" data-params="%s">'
@@ -239,7 +244,7 @@ __SYS__
   <div id="searchRows" class="rowset"></div>
   <div class="hint">type to find an app &#183; &#8592; &#8594; to move &#183; OK to open &#183; BACK to close</div>
 </div>
-<script src="spatial-nav.js"></scr__TAG__pt>
+
 <script>
 (function(){
 "use strict";
@@ -271,15 +276,22 @@ function svcCall(uri, method, params, onOk, onErr){
     b.call(uri + "/" + method, JSON.stringify(params || {}));
   } catch (e) { done(onErr, { errorText: String((e && e.message) || e) }); }
 }
+var launchBusy = false;
 function launch(id, params){
+  if (launchBusy) return;
+  launchBusy = true;
   // webOS apps expect nested params ({ id, params: {...} }); flattening them
   // into the top level means they never reach applicationManager/launch.
   var p = { id: id, params: params || null };
-  svcCall(SVC, SVC_LAUNCH_M, p, function(){}, function(e){
-    var el = document.getElementById("err");
-    el.style.display = "block";
-    el.textContent = "Could not open app: " + ((e && e.errorText) || "unknown error");
-  });
+  svcCall(SVC, SVC_LAUNCH_M, p,
+    function(){ setTimeout(function(){ launchBusy = false; }, 250); },
+    function(e){
+      launchBusy = false;
+      var el = document.getElementById("err");
+      el.style.display = "block";
+      el.textContent = "Could not open app: " + ((e && e.errorText) || "unknown error");
+    });
+  setTimeout(function(){ launchBusy = false; }, 4000);
 }
 function tileParams(el){
   try { return JSON.parse(el.getAttribute("data-params") || "null"); } catch (e) { return null; }
@@ -292,7 +304,7 @@ var SVC_PREFS_SET_M = "setPrefs";
 var SVC_LGHOME_M = "openLGHome";
 
 var __mhTiles = []; window.__mhTiles = __mhTiles;
-var PREFS = { accent: "steel", tileSize: "standard", labels: true, clock24: false, sort: "mru", pinned: [], hidden: [], focusId: "" };
+var PREFS = { accent: "steel", tileSize: "standard", labels: true, clock24: false, sort: "mru", pinned: [], hidden: [] };
 var ACCENTS = {
   steel:   { name: "Steel",   main: "#8fb6ff", soft: "rgba(143,182,255,.35)" },
   emerald: { name: "Emerald", main: "#4ade9d", soft: "rgba(74,222,157,.35)" },
@@ -450,7 +462,7 @@ function findRow(key){ for (var i = 0; i < SETTING_ROWS.length; i++) if (SETTING
 function commitPrefs(onDone){
   svcCall(SVC, SVC_PREFS_SET_M, {
     accent: PREFS.accent, tileSize: PREFS.tileSize, labels: PREFS.labels, clock24: PREFS.clock24,
-    sort: PREFS.sort, pinned: PREFS.pinned.slice(), hidden: PREFS.hidden.slice(), focusId: PREFS.focusId
+    sort: PREFS.sort, pinned: PREFS.pinned.slice(), hidden: PREFS.hidden.slice()
   }, function(){ if (onDone) onDone(); }, function(){ if (onDone) onDone(); });
 }
 function changeSetting(key, delta){
@@ -506,7 +518,7 @@ function renderSettings(){
   box.innerHTML = html.join("");
 }
 function resetAll(){
-  PREFS = { accent: "steel", tileSize: "standard", labels: true, clock24: false, sort: "mru", pinned: [], hidden: [], focusId: "" };
+  PREFS = { accent: "steel", tileSize: "standard", labels: true, clock24: false, sort: "mru", pinned: [], hidden: [] };
   applyPrefs(); renderSettings(); focusRow("reset");
   commitPrefs(function(){ refresh(); });
 }
@@ -858,20 +870,33 @@ function refresh(){
   svcCall(SVC, SVC_LIST_M, {},
     function(d){
       if (d && d.header) applyHeader(d.header);
-      if (d && d.tiles && d.tiles.length) { rebuild(d.tiles, d.inputs); }
+      if (d && d.tiles && d.tiles.length) {
+        // a served grid means the retry budget is spent cleanly (no stale
+        // tries leak into the next burst after a long foreground session)
+        tries = 0;
+        rebuild(d.tiles, d.inputs);
+      }
       else if (tries < 6) { setTimeout(refresh, 2500); }
     },
     function(e){
       if (tries < 6) { setTimeout(refresh, 2500); return; }
     });
 }
+var refreshTimer = null;
+function requestRefresh(){
+  // WAM fires visibilitychange and focus back-to-back on every foreground;
+  // coalesce both into one getTiles round-trip.
+  if (refreshTimer !== null) return;
+  refreshTimer = setTimeout(function(){ refreshTimer = null; }, 400);
+  refresh();
+}
 refresh();
 loadPrefs();
 restoreFocus();
 document.addEventListener("visibilitychange", function(){
-  if (!document.hidden) { tries = 0; refresh(); }
+  if (!document.hidden) { tries = 0; requestRefresh(); }
 });
-window.addEventListener("focus", function(){ tries = 0; refresh(); });
+window.addEventListener("focus", function(){ tries = 0; requestRefresh(); });
 })();
 </script>
 </body>

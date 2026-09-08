@@ -28,7 +28,7 @@ webos-minimal-home/
 │   ├── constants.js         # single source: ids, mount paths, log paths
 │   ├── service.js           # getTiles / launchApp / openLGHome + MRU usage
 │   ├── watcher.js           # stock Home → Minimal Home redirect daemon
-├── tests/test_build_launcher.py  # unittest suite (32: python + node-vm regression harnesses)
+├── tests/test_build_launcher.py  # unittest suite (39: python + node-vm regression harnesses)
 ├── tools/install.sh         # deploy helper (scp to the TV)
 ├── private/                 # GIT-IGNORED: credentials, personal tooling — NEVER commit
 ```

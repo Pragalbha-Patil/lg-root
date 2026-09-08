@@ -7,12 +7,19 @@ var CONFIG_FILE = C.CONFIG_FILE;
 var PREFS_FILE = C.PREFS_FILE;
 var SELF_ID = C.SELF_ID;
 
+var logSize = 0;
 function log(o) {
     o.ts = Date.now();
     try {
         var line = JSON.stringify(o) + '\n';
+        logSize += line.length;
         fs.appendFileSync(LOG, line);
-        try { if (fs.statSync(LOG).size > 100000) fs.writeFileSync(LOG, line); } catch (e) {}
+        if (logSize > 100000) {
+            // rotate by rewriting the current line; track size in memory so a
+            // hot path never pays a statSync per line
+            logSize = line.length;
+            fs.writeFileSync(LOG, line);
+        }
     } catch (e) {}
 }
 function loadUsage() {
@@ -47,8 +54,7 @@ var PREFS_DEFAULTS = {
     clock24: false,
     sort: 'mru',
     pinned: [],
-    hidden: [],
-    focusId: ''
+    hidden: []
 };
 var PREFS_CHOICES = {
     accent: ['steel', 'emerald', 'violet', 'amber', 'crimson'],
@@ -66,8 +72,6 @@ function cleanPrefs(partial) {
             out[k] = v.filter(function (x) { return typeof x === 'string' && x; }).slice(0, 30);
         } else if (k === 'hidden' && Array.isArray(v)) {
             out[k] = v.filter(function (x) { return typeof x === 'string' && x; }).slice(0, 60);
-        } else if (k === 'focusId' && typeof v === 'string') {
-            out[k] = v.slice(0, 120);
         }
     });
     return out;
@@ -148,7 +152,7 @@ service.register('getTiles', function (msg) {
                     var t = {
                         id: lp.id,
                         title: lp.title || lp.id,
-                        icon: ICONS_PREFIX + lp.id + '.png',
+                        icon: ICONS_PREFIX + lp.id.replace(/[\/\\]/g, '_') + '.png',
                         params: (lp.params && Object.keys(lp.params).length) ? lp.params : null,
                         pinned: (lp.id in pinIdx),
                         hidden: (lp.id in hiddenSet)
