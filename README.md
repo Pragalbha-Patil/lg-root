@@ -5,27 +5,7 @@ A minimalist, ad-free home screen replacement for **rooted LG webOS TVs** (devel
 No recommendations rows. No promotional tiles. No carousel of content you will never watch. Just
 **your apps**, **your inputs**, and a clock — on a near-black, OLED-friendly background.
 
-```
-┌────────────────────────────────────────────────────────────────────┐
-│  WELCOME  Minimal Home                          ⚙ Settings 10:24 PM│
-│                                                          Tuesday   │
-│                                                                     │
-│  APPS                                                               │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │
-│  │  ▶ YouTube│ │  N Netflix│ │ P. Prime │ │ S Stremio│ │ J Jellyfin│ │
-│  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘  │
-│                                                                     │
-│  INPUTS                                                             │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐               │
-│  │ TV  Live │ │ HDMI 1   │ │ HDMI 2   │ │ HDMI 3   │               │
-│  └──────────┘ └──────────┘ └──────────┘ └──────────┘               │
-│                                                                     │
-│  SYSTEM                                                             │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐                              │
-│  │ Apps     │ │ Media    │ │ Settings │ LG Home                     │
-│  └──────────┘ └──────────┘ └──────────┘                              │
-└────────────────────────────────────────────────────────────────────┘
-```
+![Minimal Home](docs/screenshots/home.png)
 
 ## Features
 
