@@ -51,9 +51,15 @@ def load_config():
     except Exception:
         return cfg
     if isinstance(user, dict):
-        for key in ("version", "ui"):
+        for key in ("version",):
             if key in user and isinstance(user[key], type(DEFAULTS[key])):
                 cfg[key] = user[key]
+        if isinstance(user.get("ui"), dict):
+            cfg["ui"] = dict(DEFAULTS["ui"])
+            for key in DEFAULTS["ui"]:
+                value = user["ui"].get(key)
+                if isinstance(value, list) and all(isinstance(i, str) for i in value):
+                    cfg["ui"][key] = value
         if isinstance(user.get("header"), dict):
             cfg["header"] = dict(DEFAULTS["header"], **user["header"])
     return cfg
