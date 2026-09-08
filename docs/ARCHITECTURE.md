@@ -58,6 +58,10 @@ rebuilding the rows. The normal startup/foreground request uses the preferences
 bundled with `getTiles`, applying them before rendering; `getPrefs` is a
 compatibility fallback for responses without preferences. Responses requested
 before or during a local preference save cannot replace the local edits.
+Each discovery request rereads the service-local `config.json`. Its response
+includes the current system-row IDs and Settings action as well as the greeting,
+so TV config edits apply at startup or foreground refresh without rebuilding.
+Older relay responses without config retain the frontend's embedded defaults.
 
 The frontend clock schedules one update at the next minute boundary, or second
 boundary for formats showing seconds. It stops while backgrounded, updates on

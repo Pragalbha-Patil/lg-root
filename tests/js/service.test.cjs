@@ -17,6 +17,26 @@ test('discovery validates data, filters duplicate/system IDs and preserves bookm
     assert.equal(replies[0].prefs.dateFormat, 'HH:mm');
 });
 
+test('config edits are reread without restarting the relay', () => {
+    const s = service();
+    const launchPoints = [{ id: 'a', title: 'Alpha' }, { id: 'z', title: 'Zulu' },
+        { id: 'system', systemApp: true }, { id: C.SETTINGS_ID, systemApp: true }];
+    function discover() {
+        const replies = s.request('getTiles');
+        s.respond({ returnValue: true, launchPoints });
+        return replies[0];
+    }
+    assert.deepEqual(discover().config, { system: [C.SETTINGS_ID], settingsTile: { id: C.SETTINGS_ID } });
+    s.disk.files.set(C.CONFIG_FILE, JSON.stringify({ header: { text: 'New', brand: 'Greeting' },
+        ui: { system: ['system'], appsPriority: ['z'] } }));
+    const updated = discover();
+    assert.deepEqual(updated.header, { text: 'New', brand: 'Greeting' });
+    assert.deepEqual(updated.config, { system: ['system'], settingsTile: null });
+    assert.deepEqual(updated.tiles.map(tile => tile.id), ['z', 'a', 'system']);
+    s.disk.files.set(C.CONFIG_FILE, JSON.stringify({ ui: { system: [], appsPriority: ['a'] } }));
+    assert.deepEqual(discover().tiles.map(tile => tile.id), ['a', 'z']);
+});
+
 test('empty or corrupt system allowlists never expose system apps', () => {
     for (const config of [[], null, { ui: [] }, { ui: { system: 'all' } }, { ui: { system: [] } },
         { header: { text: 'Hello', brand: 'Home' }, ui: {} }]) {

@@ -72,6 +72,32 @@ release archives include their own installation guide and checksum.
 The [configuration guide](docs/CONFIGURATION.md) covers greetings, app priorities,
 system tiles, persistent preferences, and personal preview builds.
 
+## Change configuration on the TV
+
+After installing this version, edit the **service-local** file on the TV:
+`/media/developer/apps/usr/palm/services/org.minimal.home.service/config.json`.
+Changes to `header.text`, `header.brand`, `ui.system`, and `ui.appsPriority`
+apply on the next launcher startup or TV boot, without rebuilding the app.
+
+To apply changes while the TV is running, connect over SSH and edit a temporary
+copy so the launcher cannot read a partly written file:
+
+```sh
+cd /media/developer/apps/usr/palm/services/org.minimal.home.service
+cp config.json config.json.bak
+cp config.json config.json.new
+vi config.json.new
+node -e 'JSON.parse(require("fs").readFileSync("config.json.new", "utf8"))' && mv config.json.new config.json
+luna-send -n 1 luna://com.webos.applicationManager/launch '{"id":"org.minimal.home"}'
+```
+
+Keep the existing JSON structure and field types; the command checks JSON syntax.
+Relaunching requests a live refresh. You can also open another app and return to
+Minimal Home. No service restart or reboot is needed for config edits; the
+foreground screen does not continuously poll the file. See the
+[configuration guide](docs/CONFIGURATION.md#on-tv-configuration) for field behavior
+and update precautions.
+
 ## Screenshots
 
 | Settings | Per-app options | Search |

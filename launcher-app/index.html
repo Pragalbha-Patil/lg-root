@@ -2089,6 +2089,16 @@ window.MH_CONFIG = {"version": "v1.4.1", "system": ["com.webos.app.discovery", "
           // a served grid means the retry budget is spent cleanly (no stale
           // tries leak into the next burst after a long foreground session)
           tries = 0;
+          // Keep row placement and Settings actions in sync with the TV config.
+          // Older relays omit config; retain the embedded defaults in that case.
+          if (M.record(d.config) && Array.isArray(d.config.system)) {
+            SYS_IDS = M.ids(d.config.system, 1000);
+            SETTINGS_TILE =
+              M.record(d.config.settingsTile) &&
+              SYS_IDS.indexOf(d.config.settingsTile.id) >= 0
+                ? { id: d.config.settingsTile.id }
+                : null;
+          }
           // Apply the same snapshot before rendering; never replace local edits
           // with a response requested before or during their save.
           if (M.record(d.prefs)) acceptPrefs(d.prefs, revision);
