@@ -11,7 +11,10 @@ var LG_HOME_TILE_ID = '__LGHOME__';
 var APP_DIR = '/media/developer/apps/usr/palm/applications/' + SELF_ID;
 // this service always lives under the same org.minimal.home.service dir.
 var SVC_DIR = '/media/developer/apps/usr/palm/services/' + SELF_ID + '.service';
-var CONFIG_FILE = APP_DIR + '/config.json';
+// Runtime config is a build-generated COPY kept in THIS dir: the dev-mode
+// service jailer cannot open files under .../applications/<id> (ENOENT),
+// so the service reads its own dir (only prefs/usage are writable there).
+var CONFIG_FILE = SVC_DIR + '/config.json';
 var BYPASS_FILE = SVC_DIR + '/.noredirect';
 var USAGE_FILE = SVC_DIR + '/usage.json';
 var PREFS_FILE = SVC_DIR + '/prefs.json';

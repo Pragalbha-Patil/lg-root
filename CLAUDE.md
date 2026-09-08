@@ -44,8 +44,9 @@ node --check launcher-service/service.js   # also watcher.js, constants.js
 
 - **Never hand-edit `launcher-app/index.html`** — edit `build_launcher.py` and rebuild. The page
   is committed so the repo is self-contained and drift is caught by `--check`.
-- Keep `launcher-app/config.json` in sync any time `build_launcher.py`'s `DEFAULTS` change: the
-  service reads the **same** file at runtime, so bake-time and live behavior can't diverge.
+- Keep `launcher-app/config.json` in sync any time `build_launcher.py`'s `DEFAULTS` change: `build_launcher.py`
+  generates a runtime copy at `launcher-service/config.json` from the **same** source and commits both, so
+  bake-time and live behavior can't diverge.
 - Version is single-sourced in `config.json`; `build_launcher.py` stamps `appinfo.json` + the
   `__MH_VERSION__` build string from it.
 
@@ -95,6 +96,12 @@ node --check launcher-service/service.js   # also watcher.js, constants.js
   `service.js`, kill the service's node PID; the next bus call relaunches it from disk. Paths come
   from `constants.js` (authoritative): app `/media/developer/apps/usr/palm/applications/org.minimal.home`,
   service `/media/developer/apps/usr/palm/services/org.minimal.home.service`.
+- **The service jailer cannot read the app dir.** A dev-mode service process gets ENOENT on any path
+  under `.../applications/<id>/` — even a world-readable `config.json` (this is why the header was
+  `null` / the allowlist silently disabled after the move to `/media/developer`). The service only
+  reliably reads its OWN dir (`.../services/org.minimal.home.service/`). That's why the build stamps
+  `launcher-service/config.json` and `CONFIG_FILE` points at the service dir; never "fix" it back to
+  the app path.
 - **Luna testing:** `luna-send -n 1 -f 'luna://<service>/<method>' '<json>'`. Screen capture for
   on-device verification: `luna://com.webos.service.capture/executeOneShot` with
   `{"path":"/tmp/x.png","method":"DISPLAY","format":"PNG"}`. Subscribe for streaming replies:

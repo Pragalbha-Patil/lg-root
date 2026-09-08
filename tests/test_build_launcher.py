@@ -231,6 +231,19 @@ class QolTest(unittest.TestCase):
         self.assertIn('getElementById("headText")', html)
         self.assertIn('getElementById("headBrand")', html)
 
+    def test_service_config_generated_from_same_source(self):
+        # The service cannot read the app-dir config (jailer ENOENT), so the
+        # build stamps an identical runtime config into the service dir.
+        out, _, _ = bl.build()
+        self.assertIn("launcher-service/config.json", out)
+        svc_cfg = json.loads(out["launcher-service/config.json"])
+        with open(os.path.join(bl.BASE, "launcher-app", "config.json"), encoding="utf-8") as f:
+            app_cfg = json.load(f)
+        self.assertEqual(svc_cfg.get("header", {}).get("brand"), app_cfg.get("header", {}).get("brand"))
+        self.assertEqual(svc_cfg["ui"]["system"], app_cfg["ui"]["system"])
+        self.assertEqual(svc_cfg["ui"]["appsPriority"], app_cfg["ui"]["appsPriority"])
+        self.assertEqual(svc_cfg.get("version"), app_cfg.get("version"))
+
 
 class UsageTest(unittest.TestCase):
     def test_usage_reads_service_path_first(self):

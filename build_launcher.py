@@ -923,6 +923,10 @@ def build(version=None):
     out = {
         "launcher-app/index.html": html,
         "launcher-app/appinfo.json": json.dumps(appinfo, indent=2) + "\n",
+        # Runtime copy for the service: the dev-mode service jailer can't read
+        # the app-dir config.json (ENOENT), so the build stamps an identical
+        # config.json into the service dir. Single git source: launcher-app/config.json.
+        "launcher-service/config.json": json.dumps(cfg, indent=4) + "\n",
     }
     return out, (len(apps), len(inputs), len(sysrow)), usage
 

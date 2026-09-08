@@ -160,7 +160,8 @@ setsid node /media/developer/apps/usr/palm/services/org.minimal.home.service/wat
 `text` is rendered small-and-regular, `brand` is rendered bold. The greeting is **per-Tv** config:
 the built-in `index.html` ships a generic "Welcome Minimal Home" banner, and `getTiles` serves your
 `config.json` header at runtime so each TV reads its own name. Change `text`/`brand` in this file and
-redeploy `launcher-app/` + `launcher-service/` (no rebuild needed).
+rebuild (`python build_launcher.py`, which stamps the runtime copy
+`launcher-service/config.json`) then redeploy `launcher-app/` + `launcher-service/`.
 
 ### System app allowlist — `launcher-app/config.json`
 
@@ -168,7 +169,8 @@ Inputs are **not configured here**: the TV publishes a launch point for every co
 (HDMI/AV/DP ports show up automatically, disappear when unplugged, and reappear if you plug a
 device back in), and the service classifies those launch points as the **Inputs** row. Only the
 non-third-party system apps you want exposed as tiles — and the Settings tile — are listed here.
-`launcher-service/service.js` loads this from the **same** `config.json` the build uses, so the
+`launcher-service/service.js` loads the runtime config from `launcher-service/config.json`, which the
+build generates from this **same** file (the dev-mode service jailer can't open the app dir), so the
 live tile list and the baked page can't drift:
 
 ```json
@@ -279,6 +281,7 @@ webos-minimal-home/
 ├── launcher-service/        # the Node relay service + redirect watcher
 │   ├── service.js           # getTiles / launchApp / openLGHome + MRU persistence
 │   ├── watcher.js           # event-driven LG Home → Minimal Home redirect
+│   ├── config.json          # GENERATED runtime config copy (see "Configuration")
 │   ├── services.json        # Luna service registration
 │   └── package.json
 └── private/                 # (git-ignored) personal dev tooling, backups, scripts
