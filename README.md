@@ -49,6 +49,7 @@ No recommendations rows. No promotional tiles. No carousel of content you will n
 - [Build](#build)
 - [Install on the TV](#install-on-the-tv)
 - [Configuration](#configuration)
+- [Screenshots](#screenshots)
 - [How it works](#how-it-works)
 - [Repository layout](#repository-layout)
 - [Development](#development)
@@ -177,6 +178,22 @@ service (capped to 60 entries). `getTiles` sorts by that stamp, newest first, th
 priority list in `launcher-app/config.json` (`ui.appsPriority`), then alphabetically. When you
 rebuild locally, `build_launcher.py` bakes that same MRU order from `launcher-service/usage.json`
 so the static page matches the live list.
+
+## Screenshots
+
+![Minimal Home](docs/screenshots/home.png)
+
+Re-capture with the CDP helper (TV DevTools Server must be running on port
+9998 — same one `webOS Dev Manager` exposes in developer mode):
+
+```bash
+python private/devtools/shot.py docs/screenshots/home.png
+```
+
+Captures the webview's live render at full TV resolution (1920×1080). Because
+the webview reports itself unfocused while under the DevTools connection, the
+D-pad focus ring does not appear in these captures — drive navigation from the
+remote for shots that need the focus highlight.
 
 ## How it works
 
