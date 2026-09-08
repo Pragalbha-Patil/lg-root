@@ -207,17 +207,13 @@ function formatDate(n, fmt){
   var Y = n.getFullYear(), M = n.getMonth() + 1, D = n.getDate();
   var m = n.getMinutes(), s = n.getSeconds();
   var dow = days[n.getDay()], mon = months[n.getMonth()];
-  var out = fmt;
-  out = out.replace("YYYY", Y).replace("YY", String(Y).slice(-2));
-  out = out.replace("MMMM", months[n.getMonth()]).replace("MMM", mon).replace("MM", p(M)).replace("M", M);
-  out = out.replace("DD", p(D)).replace("D", D);
-  out = out.replace("HH", p(h)).replace("H", h);
-  out = out.replace("hh", p(h12)).replace("h", h12);
-  out = out.replace("mm", p(m)).replace("m", m);
-  out = out.replace("ss", p(s)).replace("s", s);
-  out = out.replace("A", ap).replace("a", ap.toLowerCase());
-  out = out.replace("dddd", dow).replace("ddd", dow.slice(0, 3)).replace("dd", p(n.getDay() + 1)).replace("d", n.getDay() + 1);
-  return out;
+  var fullMonths = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  var tokens = {YYYY:Y, YY:String(Y).slice(-2), MMMM:fullMonths[n.getMonth()], MMM:mon,
+    MM:p(M), M:M, DD:p(D), D:D, HH:p(h), H:h, hh:p(h12), h:h12,
+    mm:p(m), m:m, ss:p(s), s:s, A:ap, a:ap.toLowerCase(),
+    dddd:dow, ddd:dow.slice(0, 3), dd:p(n.getDay() + 1), d:n.getDay() + 1};
+  // Replace original tokens once; never interpret letters in the resulting names.
+  return fmt.replace(/YYYY|MMMM|dddd|MMM|ddd|YY|MM|DD|HH|hh|mm|ss|dd|M|D|H|h|m|s|A|a|d/g, function(token){ return tokens[token]; });
 }
 function tick(){
   var n = new Date();
@@ -751,9 +747,9 @@ document.addEventListener("click", function(e){
 });
 
 function tickInterval(){
-  return /ss|s/.test(PREFS.dateFormat) ? 1000 : 15000;
+  return 1000;
 }
-tick(); setInterval(function(){ tick(); setInterval(arguments.callee, tickInterval()); }, tickInterval());
+tick(); setInterval(tick, tickInterval());
 var tries = 0;
 function applyHeader(h){
   if (!h) return;

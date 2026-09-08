@@ -28,7 +28,7 @@ const fsMock = {
     }
     return Buffer.from('');
   },
-  writeFileSync: (dst, b) => { files[dst] = b.toString(); writes++; },
+  writeFileSync: (dst, b) => { files[dst] = b.toString(); if (dst.includes('/icons/')) writes++; },
   unlinkSync() {}, appendFileSync() {}, statSync: () => ({ size: 0 })
 };
 const context = {

@@ -308,10 +308,12 @@ service.register('setPrefs', function (msg) {
 
 service.register('getSystemStats', function (msg) {
     try {
-        var stats = { cpu: 0, ram: 0, temp: null };
+        var stats = { cpu: null, ram: null, temp: null };
         try {
             var raw = fs.readFileSync('/tmp/minhome-stats.json', 'utf8');
-            stats = JSON.parse(raw);
+            var sample = JSON.parse(raw);
+            if (sample && typeof sample.timestamp === 'number' &&
+                Date.now() - sample.timestamp >= 0 && Date.now() - sample.timestamp < 20000) stats = sample;
         } catch (e) {}
         log({ m: 'getSystemStats', cpu: stats.cpu, ram: stats.ram, temp: stats.temp });
         msg.respond({ returnValue: true, cpu: stats.cpu, ram: stats.ram, temp: stats.temp });

@@ -96,9 +96,11 @@ function provisionSettingsIcon() {
     } catch (e) { log({ provErr: 'settings:' + String((e && e.code) || e) }); }
 }
 
+var lastCpuTotal = null;
+var lastCpuIdle = null;
+
 function collectSystemStats() {
     try {
-        // Read prefs to respect showSystemStats toggle
         var showStats = true;
         try {
             var prefs = JSON.parse(fs.readFileSync('/media/developer/apps/usr/palm/services/org.minimal.home.service/prefs.json', 'utf8'));
@@ -107,44 +109,52 @@ function collectSystemStats() {
         if (!showStats) { return; }
 
         // CPU
-        var cpuUsage = 0;
-        var stat = fs.readFileSync('/proc/stat', 'utf8');
-        var m = stat.match(/^cpu\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)/);
-        if (m) {
-            var user = parseInt(m[1], 10), nice = parseInt(m[2], 10);
-            var sys = parseInt(m[3], 10), idle = parseInt(m[4], 10);
-            var total = user + nice + sys + idle;
-            if (typeof lastCpuTotal === 'number' && total > lastCpuTotal) {
-                var diffTotal = total - lastCpuTotal;
-                var diffIdle = idle - (lastCpuIdle || 0);
-                cpuUsage = Math.max(0, Math.min(100, Math.round(100 * (diffTotal - diffIdle) / diffTotal)));
+        var cpuUsage = null;
+        try {
+            var stat = fs.readFileSync('/proc/stat', 'utf8');
+            var m = stat.match(/^cpu\s+([^\n]+)/);
+            if (m) {
+                // Guest time is already included in user/nice; count only the first eight fields.
+                var fields = m[1].trim().split(/\s+/).slice(0, 8).map(Number);
+                var idle = fields[3] + (fields[4] || 0);
+                var total = fields.reduce(function(sum, value) { return sum + value; }, 0);
+                if (typeof lastCpuTotal === 'number' && total > lastCpuTotal) {
+                    var diffTotal = total - lastCpuTotal;
+                    var diffIdle = idle - (lastCpuIdle || 0);
+                    cpuUsage = Math.max(0, Math.min(100, Math.round(100 * (diffTotal - diffIdle) / diffTotal)));
+                }
+                lastCpuTotal = total;
+                lastCpuIdle = idle;
             }
-            lastCpuTotal = total;
-            lastCpuIdle = idle;
-        }
+        } catch (e) { log({ cpuErr: String((e && e.message) || e) }); }
+
         // RAM
-        var ramUsage = 0;
-        var mem = fs.readFileSync('/proc/meminfo', 'utf8');
-        var total = parseInt((mem.match(/MemTotal:\s+(\d+)/) || [])[1] || '0', 10);
-        var avail = parseInt((mem.match(/MemAvailable:\s+(\d+)/) || [])[1] || '0', 10);
-        if (total > 0) ramUsage = Math.round(100 * (total - avail) / total);
+        var ramUsage = null;
+        try {
+            var mem = fs.readFileSync('/proc/meminfo', 'utf8');
+            var total = parseInt((mem.match(/MemTotal:\s+(\d+)/) || [])[1] || '0', 10);
+            var avail = parseInt((mem.match(/MemAvailable:\s+(\d+)/) || [])[1] || '0', 10);
+            if (total > 0) ramUsage = Math.round(100 * (total - avail) / total);
+        } catch (e) { log({ ramErr: String((e && e.message) || e) }); }
+
         // Temp
         var tempC = null;
-        var zones = fs.readdirSync('/sys/class/thermal');
-        for (var i = 0; i < zones.length; i++) {
-            var tz = zones[i];
-            if (/^thermal_zone\d+$/.test(tz)) {
-                var t = fs.readFileSync('/sys/class/thermal/' + tz + '/temp', 'utf8').trim();
-                var tc = parseInt(t, 10);
-                if (!isNaN(tc)) { tempC = Math.round(tc / 1000); break; }
+        try {
+            var zones = fs.readdirSync('/sys/class/thermal');
+            for (var i = 0; i < zones.length; i++) {
+                var tz = zones[i];
+                if (/^thermal_zone\d+$/.test(tz)) {
+                    var t = fs.readFileSync('/sys/class/thermal/' + tz + '/temp', 'utf8').trim();
+                    var tc = parseInt(t, 10);
+                    if (!isNaN(tc)) { tempC = Math.round(tc / 1000); break; }
+                }
             }
-        }
-        fs.writeFileSync(STATS_FILE, JSON.stringify({ cpu: cpuUsage, ram: ramUsage, temp: tempC }));
+        } catch (e) { log({ tempErr: String((e && e.message) || e) }); }
+
+        fs.writeFileSync(STATS_FILE + '.tmp', JSON.stringify({ cpu: cpuUsage, ram: ramUsage, temp: tempC, timestamp: Date.now() }));
+        fs.renameSync(STATS_FILE + '.tmp', STATS_FILE);
     } catch (e) { log({ statsErr: String((e && e.message) || e) }); }
 }
-
-var lastCpuTotal = null;
-var lastCpuIdle = null;
 
 async function runProvision() {
     try {
