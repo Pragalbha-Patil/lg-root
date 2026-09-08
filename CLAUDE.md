@@ -85,6 +85,12 @@ node --check launcher-service/service.js   # also watcher.js, constants.js
   `subscribe`; there is NO `getForegroundApp`. `com.webos.notification/{getStatus,getNotifications}`,
   `settings/getSettings`, `db8/listKinds`, `setOrder`/`moveLaunchPoint` do not exist / do nothing on
   this build. Don't design against them.
+- **Back key is app-owned only with `disableBackHistoryAPI`.** With the default (false), the platform
+  routes Back to the browser history API — on the entry page the webview never receives the key and
+  WAM shows a system "exit app?" dialog. Set `"disableBackHistoryAPI": true` in `appinfo.json`
+  (and restart SAM/reboot for it to apply), then Back arrives as keyCode 461 and is yours to
+  swallow/handle, so the dialog can never appear. `preventDefault()` on keydown alone does NOT stop
+  the system dialog — the flag is the real switch.
 - **Dynamic service reload:** `org.minimal.home.service` runs on-demand under Luna. To pick up new
   `service.js`, kill the service's node PID; the next bus call relaunches it from disk. Paths come
   from `constants.js` (authoritative): app `/media/developer/apps/usr/palm/applications/org.minimal.home`,
