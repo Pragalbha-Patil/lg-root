@@ -148,6 +148,7 @@ class InstallerTest(unittest.TestCase):
         self.log = self.root / "calls.log"
         self.env = dict(os.environ, TV_HOST="example-tv", TV_USER="root",
                         PYTHON=Path(sys.executable).as_posix(), MH_CALL_LOG=self.log.as_posix(),
+                        MH_TEST_BIN=self.bin.as_posix(),
                         MH_RESPONSE='{"returnValue":true}', MH_SSH_EXIT="0", MH_SCP_EXIT="0")
         self.env.pop("APP_ID", None)
         self.env.pop("SVC_ID", None)
@@ -171,7 +172,19 @@ class InstallerTest(unittest.TestCase):
 
     def install(self, *args):
         # Run outside the checkout to catch accidental reliance on cwd.
-        return subprocess.run([SHELL, (ROOT / "tools/install.sh").as_posix(), *args],
+        # Git for Windows' bin/sh.exe wrapper can prepend its own binaries on
+        # startup. Set PATH inside that shell and verify both stubs before any
+        # installer code runs, so tests can never fall through to real SSH/SCP.
+        bootstrap = (
+            'stub_bin=$(cd "$MH_TEST_BIN" && pwd) || exit 98\n'
+            'PATH="$stub_bin:$PATH"\nexport PATH\n'
+            'for tool in ssh scp; do\n'
+            '  if [ "$(command -v "$tool")" != "$stub_bin/$tool" ]; then\n'
+            '    echo "test stub not selected: $tool" >&2; exit 99\n'
+            '  fi\ndone\n'
+            '. "$0"\n'
+        )
+        return subprocess.run([SHELL, "-c", bootstrap, (ROOT / "tools/install.sh").as_posix(), *args],
                               cwd=self.root, env=self.env, capture_output=True,
                               text=True, encoding="utf-8", timeout=30)
 
