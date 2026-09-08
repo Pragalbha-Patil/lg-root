@@ -1,0 +1,36 @@
+name: Bug report
+description: Report a reproducible problem with Minimal Home.
+body:
+  - type: markdown
+    attributes:
+      value: "For vulnerabilities, use SECURITY.md instead. Remove credentials, device addresses, and identifying information from logs."
+  - type: input
+    id: version
+    attributes:
+      label: Minimal Home version or commit
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: TV model, webOS/firmware version, and installation method. For local tooling, include OS, Python, and Node versions.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Redacted logs or screenshots
+      description: Relevant excerpts from /tmp/minhome-svc.log or /tmp/minhome-watch.log, if available.

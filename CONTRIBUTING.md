@@ -1,104 +1,98 @@
 # Contributing to Minimal Home
 
-First off — thank you for considering a contribution. This project started as a personal
-launcher on a rooted LG webOS TV, and the goal of making it public is to let the community
-grow it into something better.
+Contributions can be code, documentation, tests, accessibility improvements, or
+device reports. You do not need a TV to improve the build tools or regression
+suite. Please follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
-All contributors are expected to follow our [Code of Conduct](CODE_OF_CONDUCT.md).
+## Before you start
 
-## Table of contents
+Search [existing issues](https://github.com/Pragalbha-Patil/webos-minimal-home/issues)
+for related work. Open a feature proposal before a large change so the scope and
+device constraints can be discussed. Small fixes can go straight to a pull request.
 
-- [Ground rules](#ground-rules)
-- [Getting started](#getting-started)
-- [How to contribute](#how-to-contribute)
-  - [Report a bug](#report-a-bug)
-  - [Propose a feature](#propose-a-feature)
-  - [Write code](#write-code)
-- [Development environment](#development-environment)
-- [Where things live](#where-things-live)
-- [Good first issues](#good-first-issues)
+Use the bug report form for reproducible problems. Include the TV model,
+firmware/webOS version, installation method, expected behavior, and redacted
+logs. Security vulnerabilities belong in the [private reporting process](SECURITY.md).
 
-## Ground rules
+## Local setup
 
-1. **No secrets in the public tree.** This repository once contained private working state
-   (TV addresses, SSH credentials, session logs). That tooling now lives in the git-ignored
-   `private/` directory and must **never** be committed. Double-check `git status` before
-   committing: nothing under `private/` should ever be staged.
-2. **Respect that most users have a rooted TV but not your TV.** Avoid hardcoding IPs,
-   credentials, or hardware specifics in contributions. Add config or environment-variable
-   hooks instead.
-3. **A rooted TV is the user's responsibility.** Document risks; never downplay them.
-4. Keep changes focused. One pull request = one logical change.
+Install Git, Python 3.10+, and Node.js 22 or 24. A POSIX shell is needed to test
+the installer; Git Bash or WSL works on Windows. There are no pip or npm
+dependencies to install. The `webos-service` module belongs to the TV runtime,
+and tests mock it locally.
 
-## Getting started
+```sh
+git clone https://github.com/YOUR-USERNAME/webos-minimal-home.git
+cd webos-minimal-home
+git switch -c fix/describe-the-change
+python build_launcher.py
+python tools/check.py
+```
 
-1. Fork the repository.
-2. Clone your fork:
-   ```sh
-   git clone https://github.com/<your-user>/webos-minimal-home.git
-   cd webos-minimal-home
-   ```
-3. Create a branch:
-   ```sh
-   git checkout -b feature/your-change
-   ```
-4. Make your changes (see [Development environment](#development-environment)).
-5. Build to confirm nothing is broken:
-   ```sh
-   python build_launcher.py
-   ```
-6. Commit with a clear message, e.g. `launcher-service: skip fullscreen apps in getTiles`.
-7. Push and open a pull request describing **what** you changed and **why**, plus how you tested it.
+CI tests Python 3.10/Node 22 and Python 3.14/Node 24 on Linux, plus
+Python 3.14/Node 24 on Windows. These are host-tool versions, not a claim about
+the TV's Node version.
 
-## How to contribute
+## Make a change
 
-### Report a bug
+1. Find the source in the [architecture guide](docs/ARCHITECTURE.md).
+2. Follow the [coding standards](docs/CODING_STANDARDS.md) and existing conventions
+   in the file you touch.
+3. For frontend changes, edit `build_launcher.py`, then regenerate. Commit
+   changed generated files together with their sources.
+4. Add a regression test for a behavior change or bug fix. Keep fixtures synthetic;
+   never include device credentials, private snapshots, or session logs.
+5. Run `python tools/check.py` and review `git diff` and `git status --short`.
+6. Open a focused pull request explaining the problem, resulting behavior, and
+   validation. State which device checks you could or could not perform.
 
-Open an issue and include:
+The check command verifies generated artifacts, Python/JavaScript syntax,
+JSON, local Markdown file links, shell syntax when available, regression tests,
+and diff whitespace. Node is mandatory so runtime tests cannot silently skip.
+Use `python tools/check.py --require-shell` for the Linux CI gate. Set `SH` to a
+POSIX shell executable if automatic detection fails.
 
-- TV model and webOS version (Settings → Support → Software info / `systemctl` version output)
-- How you installed Minimal Home (boot hook, manual scp, etc.)
-- Steps to reproduce
-- What you expected to happen vs. what happened
-- Relevant logs (`/tmp/minhome-svc.log`, `/tmp/minhome-watch.log`)
+For a focused test while iterating:
 
-### Propose a feature
+```sh
+python -m unittest discover -s tests -p test_launch_params.py -v
+```
 
-Open an issue describing the feature, the problem it solves, and rough idea of the approach.
-Small, well-scoped proposals are much easier to accept than large rewrites.
+Do not hand-edit `launcher-app/index.html` or `launcher-service/config.json`.
+The generator also owns the version in `launcher-app/appinfo.json`.
+Use `launcher-app/config.json` for the source version.
 
-### Write code
+## Review expectations
 
-- **Follow existing patterns.** The codebase is deliberately small and dependency-light:
-  plain ES5 where possible (older webOS builds lack newer JS features), no build toolchain beyond
-  Python, vanilla CSS/JS.
-- **Comment only where the *why* matters**, not the what.
-- **Verify on device if you can.** Not every fix can be tested in a browser; but if you can at
-  least confirm the build runs (`python build_launcher.py`) and, where applicable, that the
-  generated page renders, that goes a long way.
+Keep unrelated refactors out of a bug fix. Explain webOS-specific workarounds
+and preserve their regression coverage. Include screenshots for visible changes
+when possible, and report actual validation rather than assumed compatibility.
+You are responsible for understanding and verifying all submitted code,
+including changes prepared with an AI assistant.
 
-## Development environment
+Commit messages should describe the result, for example
+`installer: report failed Luna launch requests`. No special commit signing,
+DCO, or title format is required by the tooling in this repository.
 
-- Python 3.7+ (build script only).
-- Optionally `node` locally, but the service runs **on the TV**, so most service changes need
-  an actual device to validate.
-- No third-party runtime dependencies for the launcher itself.
+## Device testing
 
-## Where things live
+Use the [installation guide](docs/INSTALL.md). For changes involving launch or
+navigation, exercise cold launch, return from another app, D-pad/OK/Back,
+input switching, and the LG Home bypass. For preferences, check persistence
+after relaunch. For watcher changes, check recovery after a Luna subscription
+disconnect and ensure only one watcher is running.
 
-| Area                          | Location                  | Notes                                              |
-| ----------------------------- | ------------------------- | -------------------------------------------------- |
-| Launcher page (UI + build)    | `launcher-app/`, `build_launcher.py` | `index.html` is generated — edit the generator, not the artifact |
-| Relay service (Luna API)      | `launcher-service/service.js`       | `getTiles`, `launchApp`, `openLGHome`, MRU storage |
-| LG Home redirect watcher      | `launcher-service/watcher.js`       | Event-driven foreground watcher                    |
-| Personal dev tooling + backups| `private/` (ignored)     | Never committed                                    |
+Report the model and firmware tested. Local VM tests use mocked platform APIs;
+they cannot replace on-device checks.
 
-## Good first issues
+## Releases
 
-Look for issues labelled `good first issue`. Ideas the community has already flagged:
+Maintainers should follow [RELEASING.md](docs/RELEASING.md). Contributors do not
+need to bump the version for every patch.
 
-- Additional tile sections (e.g. a configurable "pinned" row)
-- Theme / accent color configuration
-- Input power / CEC integration on tile focus
-- Better first-run experience / onboarding instructions
-- Accessibility improvements for remote-driven focus
+## Guide design
+
+This guide uses the clear setup, change, and review structure found in
+[Node.js's contribution guide](https://github.com/nodejs/node/blob/main/CONTRIBUTING.md)
+and [GitHub Docs' contribution guide](https://github.com/github/docs/blob/main/.github/CONTRIBUTING.md).
+Project-specific requirements here are intentionally small.

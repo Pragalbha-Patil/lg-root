@@ -273,12 +273,5 @@ class QolTest(unittest.TestCase):
         self.assertEqual(svc_cfg.get("version"), app_cfg.get("version"))
 
 
-class UsageTest(unittest.TestCase):
-    def test_usage_reads_service_path_first(self):
-        bl.SVC_DIR = bl.SVC_DIR
-        path = os.path.join(bl.SVC_DIR, "usage.json")
-        self.assertIn("usage.json", path)
-
-
 if __name__ == "__main__":
     unittest.main()

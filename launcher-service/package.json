@@ -1,4 +1,7 @@
 {
     "name": "org.minimal.home.service",
+    "description": "Luna relay for the Minimal Home webOS launcher",
+    "license": "MIT",
+    "private": true,
     "main": "service.js"
 }

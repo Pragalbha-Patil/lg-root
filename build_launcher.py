@@ -4,6 +4,7 @@ Run `python build_launcher.py` to regenerate launcher-app/index.html and appinfo
 Use `--check` to verify tracked outputs are up to date (CI gate).
 """
 import argparse
+import copy
 import json
 import os
 import re
@@ -49,19 +50,32 @@ def is_input_id(i):
 
 
 def load_config():
-    cfg = dict(DEFAULTS)
+    cfg = copy.deepcopy(DEFAULTS)
     p = os.path.join(APP_DIR, "config.json")
     try:
         with open(p, encoding="utf-8") as f:
             user = json.load(f)
-    except Exception:
+    except FileNotFoundError:
         return cfg
-    if isinstance(user, dict):
-        for key in ("version", "ui"):
-            if key in user and isinstance(user[key], type(DEFAULTS[key])):
-                cfg[key] = user[key]
-        if isinstance(user.get("header"), dict):
-            cfg["header"] = dict(DEFAULTS["header"], **user["header"])
+    if not isinstance(user, dict):
+        raise ValueError("config.json must contain an object")
+    if "version" in user:
+        if not isinstance(user["version"], str) or not re.fullmatch(r"\d+\.\d+\.\d+", user["version"]):
+            raise ValueError("config.json version must be MAJOR.MINOR.PATCH")
+        cfg["version"] = user["version"]
+    for section in ("header", "ui"):
+        if section not in user:
+            continue
+        if not isinstance(user[section], dict):
+            raise ValueError("config.json %s must contain an object" % section)
+        cfg[section].update(user[section])
+    for key in ("text", "brand"):
+        if not isinstance(cfg["header"][key], str):
+            raise ValueError("config.json header.%s must be a string" % key)
+    for key in ("system", "appsPriority"):
+        value = cfg["ui"][key]
+        if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+            raise ValueError("config.json ui.%s must be an array of strings" % key)
     return cfg
 
 
@@ -71,16 +85,18 @@ def load_tiles():
     return data.get("launchPoints", [])
 
 
-def load_usage():
-    for p in (os.path.join(SVC_DIR, "usage.json"), os.path.join(APP_DIR, "usage.json")):
-        try:
-            with open(p, encoding="utf-8") as f:
-                u = json.load(f)
-            if isinstance(u, dict):
-                return u
-        except Exception:
-            continue
-    return {}
+def load_usage(path=None):
+    # Personal runtime state must never silently affect a public build.
+    if path is None:
+        return {}
+    with open(path, encoding="utf-8") as f:
+        usage = json.load(f)
+    if not isinstance(usage, dict) or not all(
+        isinstance(value, int) and not isinstance(value, bool) and value >= 0
+        for value in usage.values()
+    ):
+        raise ValueError("usage must be an object mapping app IDs to nonnegative integers")
+    return usage
 
 
 def classify(tiles, cfg):
@@ -954,11 +970,14 @@ window.addEventListener("focus", function(){ tries = 0; requestRefresh(); });
 """
 
 
-def build(version=None):
+def build(version=None, usage_path=None):
     cfg = load_config()
-    usage = load_usage()
+    usage = load_usage(usage_path)
     apps, inputs, sysrow = classify(load_tiles(), cfg)
     version = version or cfg.get("version") or "1.0.0"
+    if not re.fullmatch(r"\d+\.\d+\.\d+", version):
+        raise ValueError("version must be MAJOR.MINOR.PATCH")
+    cfg["version"] = version
 
     # Banner is baked from DEFAULTS so committed index.html stays generic;
     # the per-TV greeting comes from config.json at runtime (getTiles.header).
@@ -1010,9 +1029,13 @@ def main(argv=None):
     ap.add_argument("--check", action="store_true",
                     help="verify committed build output is up to date (no writes)")
     ap.add_argument("--version", default=None, help="override version")
+    ap.add_argument("--usage", metavar="PATH", help="bake a personal usage snapshot (local builds only)")
     args = ap.parse_args(argv)
 
-    out, (na, ni, ns), usage = build(args.version)
+    try:
+        out, (na, ni, ns), usage = build(args.version, args.usage)
+    except (OSError, ValueError) as exc:
+        ap.exit(1, "error: %s\n" % exc)
 
     diffs = []
     for rel, content in out.items():
@@ -1025,7 +1048,7 @@ def main(argv=None):
         if current != content:
             diffs.append(rel)
             if not args.check:
-                with open(path, "w", encoding="utf-8") as f:
+                with open(path, "w", encoding="utf-8", newline="\n") as f:
                     f.write(content)
 
     print("baked apps=%d inputs=%d sys=%d" % (na, ni, ns))

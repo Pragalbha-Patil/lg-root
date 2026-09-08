@@ -1,4 +1,4 @@
-﻿import json
+import json
 import shutil
 import subprocess
 import unittest
@@ -30,7 +30,7 @@ assert.equal(ticks,101);
 ''')
 
     def test_cpu_deltas_and_stale_service_samples(self):
-        watcher = Path('launcher-service/watcher.js').read_text()
+        watcher = Path('launcher-service/watcher.js').read_text(encoding='utf-8')
         collector = watcher[watcher.index('var lastCpuTotal'):watcher.index('async function runProvision')]
         self.run_js('const assert=require("assert");' + '''
 let stat='cpu  100 0 100 800 20 10 10 0 0 0', written;
