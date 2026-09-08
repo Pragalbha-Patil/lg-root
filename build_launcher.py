@@ -367,8 +367,10 @@ function rebuild(tiles, liveInputs){
     list.inputs.push(t);
   });
   var hasSettings = false;
-  list.sys.forEach(function(t){ if (t.id === SETTINGS_TILE.id) hasSettings = true; });
-  if (SETTINGS_TILE && PREFS.hidden.indexOf(SETTINGS_TILE.id) < 0 && !hasSettings) list.sys.push(SETTINGS_TILE);
+  if (SETTINGS_TILE) {
+    list.sys.forEach(function(t){ if (t.id === SETTINGS_TILE.id) hasSettings = true; });
+    if (PREFS.hidden.indexOf(SETTINGS_TILE.id) < 0 && !hasSettings) list.sys.push(SETTINGS_TILE);
+  }
   grid.innerHTML = ""; inputs.innerHTML = ""; sysrow.innerHTML = "";
   function reorder(arr){
     var pins = [], rest = [];
@@ -628,7 +630,7 @@ function activateRow(el){
   var key = el.getAttribute("data-key");
   var id = el.getAttribute("data-id");
   if (mode === "settings") {
-    if (key === "tvsettings") { hideOverlay(); launch(SETTINGS_TILE.id, null); return; }
+    if (key === "tvsettings") { hideOverlay(); if (SETTINGS_TILE) launch(SETTINGS_TILE.id, null); return; }
     if (key === "close") { hideOverlay(); return; }
     if (key === "manage") { openManage(); return; }
     if (key === "reset") { resetAll(); return; }
