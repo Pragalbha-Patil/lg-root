@@ -73,6 +73,12 @@ Use `launcher-app/config.json` for the source version.
 
 ## Review expectations
 
+Changes to `main` require a pull request, passing CI against the latest `main`,
+resolved review conversations, and approval from `@Pragalbha-Patil`, the code owner
+for every file. New changes dismiss prior approval. GitHub does not allow authors
+to approve their own pull requests; this also applies to PRs opened by an agent
+using the owner's credentials.
+
 Keep unrelated refactors out of a bug fix. Explain webOS-specific workarounds
 and preserve their regression coverage. Include screenshots for visible changes
 when possible, and report actual validation rather than assumed compatibility.

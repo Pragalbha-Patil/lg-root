@@ -60,6 +60,11 @@ device quirks without evidence. Runtime tests live in `tests/js/` and exercise
 complete scripts with isolated DOM/platform mocks. Preserve per-file coverage gates;
 do not add exclusions to meet them. Run the shared check command after changes.
 
+`main` requires pull requests, current passing CI, resolved review conversations,
+and code-owner approval from `@Pragalbha-Patil`. New changes dismiss approval.
+Do not approve on the owner's behalf or bypass protection. GitHub prevents
+self-approval, including PRs an agent opens using the owner's credentials.
+
 Local development does not imply deployment: do not contact a TV, install boot
 hooks, restart services, publish releases, or push changes unless the task
 authorizes that action. Do not read or publish `private/` for routine repo work.
