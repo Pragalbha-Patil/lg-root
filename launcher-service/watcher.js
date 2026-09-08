@@ -113,7 +113,10 @@ function watch() {
             } catch (e) { /* ignore invalid */ }
         }
     });
+    let reconnecting = false;
     const reconnect = (why) => {
+        if (reconnecting) return;
+        reconnecting = true;
         log({ resubscribe: why });
         try { child.kill(); } catch (e) {}
         setTimeout(watch, 3000);
