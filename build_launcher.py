@@ -222,8 +222,7 @@ function svcCall(uri, method, params, onOk, onErr){
   } catch (e) { done(onErr, { errorText: String((e && e.message) || e) }); }
 }
 function launch(id, params){
-  var p = { id: id };
-  if (params) { for (var k in params) { if (Object.prototype.hasOwnProperty.call(params, k)) p[k] = params[k]; } }
+  var p = { id: id, params: params || null };
   svcCall(SVC, SVC_LAUNCH_M, p, function(){}, function(e){
     var el = document.getElementById("err");
     el.style.display = "block";
