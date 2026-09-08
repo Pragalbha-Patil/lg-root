@@ -100,7 +100,6 @@ function watch() {
         return out;
     }
     child.stdout.on('data', (chunk) => {
-        try { fs.appendFileSync('/tmp/minhome-watch.raw', 'CHUNK[' + chunk.length + ']:' + ('' + chunk).slice(0, 150) + '\n'); } catch (e) {}
         buf += chunk.toString();
         const objs = extractObjects();
         for (const o of objs) {

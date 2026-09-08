@@ -1,4 +1,4 @@
-"""Build Minimal Home v4: ATV-style sections + relay-service wiring + beacon."""
+"""Build Minimal Home: ATV-style sections + relay-service wiring."""
 import json, os, re, html as htmllib
 
 BASE = os.path.dirname(os.path.abspath(__file__))
@@ -16,9 +16,6 @@ INPUT_IDS = {"com.webos.app.livetv", "com.webos.app.hdmi1", "com.webos.app.hdmi2
              "com.webos.app.hdmi3", "com.webos.app.hdmi4"}
 SYS_IDS = {"com.webos.app.discovery", "com.webos.app.mediadiscovery"}
 
-def safe(n):
-    return re.sub(r"[^a-zA-Z0-9._-]", "_", n)
-
 apps, inputs, sysrow = [], [], []
 for lp in tiles:
     i = lp.get("id", "")
@@ -31,7 +28,7 @@ for lp in tiles:
         continue
     icon = lp.get("largeIcon") or lp.get("icon") or ""
     t = {"id": i, "title": lp.get("title") or i,
-         "icon": ("icons/" + safe(i) + ".png") if icon else "",
+         "icon": icon,
          "params": lp.get("params") if isinstance(lp.get("params"), dict) and lp.get("params") else None}
     if i in INPUT_IDS:
         inputs.append(t)
@@ -40,7 +37,7 @@ for lp in tiles:
     else:
         apps.append(t)
 
-sysrow.append({"id": "com.palm.app.settings", "title": "Settings", "icon": "icons/settings.png", "params": None})
+sysrow.append({"id": "com.palm.app.settings", "title": "Settings", "icon": "/usr/palm/applications/com.palm.app.settings/icon.png", "params": None})
 sysrow.append({"id": "__LGHOME__", "title": "LG Home", "icon": "", "params": None})
 
 def tile_html(t):
@@ -108,7 +105,6 @@ h1 b{font-weight:700}
 .tile .label{font-size:22px;font-weight:400;color:#d6dce5;text-align:center;padding:15px 12px 17px;background:rgba(255,255,255,.035);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tile:focus{outline:none;background:#1b1f27;border-color:#fff;transform:scale(1.06);box-shadow:0 18px 44px rgba(0,0,0,.6)}
 .tile:focus .label{color:#fff;font-weight:600}
-#status{position:fixed;bottom:24px;left:76px;color:#5d6b7d;font-size:16px}
 #err{display:none;margin-top:40px;font-size:20px;color:#ff9a9a}
 </style>
 </head>
@@ -133,7 +129,6 @@ __INPUTS__
 __SYS__
 </div>
 <div id="err"></div>
-<div id="status"></div>
 <script src="spatial-nav.js"></scr__TAG__pt>
 <script>
 (function(){
@@ -144,12 +139,6 @@ var SVC = "luna://org.minimal.home.service";
 var BUILD = "v9-mru"; window.__MHBUILD = BUILD;
 var SVC_LIST_M = "getTiles";
 var SVC_LAUNCH_M = "launchApp";
-var statusEl = document.getElementById("status");
-function status(t){ statusEl.textContent = t; }
-function beacon(o){
-  o.v = 4; o.build = BUILD; o.t = Date.now();
-  try { localStorage.setItem("minhome_diag", JSON.stringify(o)); } catch (e) {}
-}
 function svcCall(uri, method, params, onOk, onErr){
   window.__mhKeep = window.__mhKeep || [];
   function done(fn, arg){ try { fn(arg); } catch (e) {} }
@@ -171,13 +160,6 @@ function svcCall(uri, method, params, onOk, onErr){
     };
     b.call(uri + "/" + method, JSON.stringify(params || {}));
   } catch (e) { done(onErr, { errorText: String((e && e.message) || e) }); }
-}
-function envFacts(){
-  var f = {};
-  try { f.navsvc = typeof navigator.service; } catch (e) { f.navsvc = "err"; }
-  try { f.navreq = typeof (navigator.service && navigator.service.request); } catch (e) { f.navreq = "err"; }
-  try { f.psb = typeof PalmServiceBridge; } catch (e) { f.psb = "err"; }
-  return f;
 }
 function launch(id, params){
   var p = { id: id };
@@ -307,32 +289,20 @@ function tick(){
     "<small>" + days[n.getDay()] + " " + p(n.getDate()) + "." + p(n.getMonth() + 1) + "</small>";
 }
 tick(); setInterval(tick, 15000);
-beacon({ live: false, n: document.querySelectorAll("#grid .tile, #inputs .tile, #sysrow .tile").length, err: "boot-baked", env: envFacts() });
 var tries = 0;
 function refresh(){
   tries++;
   svcCall(SVC, SVC_LIST_M, {},
     function(d){
-      if (d && d.tiles && d.tiles.length) { rebuild(d.tiles); beacon({ live: true, n: d.tiles.length, err: "" }); }
+      if (d && d.tiles && d.tiles.length) { rebuild(d.tiles); }
       else if (tries < 6) { setTimeout(refresh, 2500); }
-      else { beacon({ live: false, n: 0, err: "empty-list" }); }
     },
     function(e){
       if (tries < 6) { setTimeout(refresh, 2500); return; }
-      beacon({ live: false, n: 0, err: String((e && e.errorText) || e || "unknown") });
     });
 }
 refresh();
 
-function probeBeacon(o){
-  o.v = 4; o.t = Date.now();
-  try { localStorage.setItem("minhome_probe", JSON.stringify(o)); } catch (e) {}
-}
-setTimeout(function(){
-  svcCall("luna://com.webos.applicationManager", "launch", { id: "org.minimal.home.probe-nonexistent-xyz" },
-    function(d){ probeBeacon({ probe: "launch", via: "ok-cb", res: JSON.stringify(d).slice(0, 120) }); },
-    function(e){ probeBeacon({ probe: "launch", via: "err-cb", res: JSON.stringify(e).slice(0, 120) }); });
-}, 4000);
 var first = document.querySelector("#grid .tile");
 if (first) first.focus();
 document.addEventListener("visibilitychange", function(){

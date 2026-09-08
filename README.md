@@ -95,11 +95,13 @@ SSH credentials and personal tooling stay out of the public tree). Deploy via pl
 # 1. Build the app locally
 python build_launcher.py
 
-# 2. Upload the app
-scp -r launcher-app root@<TV-IP>:/media/developer/apps/usr/palm/applications/org.minimal.home/
+# 2. Upload the app (the trailing /./ flattens launcher-app into the target dir)
+ssh root@<TV-IP> "mkdir -p /media/developer/apps/usr/palm/applications/org.minimal.home"
+scp -r launcher-app/. root@<TV-IP>:/media/developer/apps/usr/palm/applications/org.minimal.home/
 
 # 3. Upload the relay service
-scp -r launcher-service root@<TV-IP>:/media/developer/apps/usr/palm/services/org.minimal.home.service/
+ssh root@<TV-IP> "mkdir -p /media/developer/apps/usr/palm/services/org.minimal.home.service"
+scp -r launcher-service/. root@<TV-IP>:/media/developer/apps/usr/palm/services/org.minimal.home.service/
 
 # 4. Launch it
 ssh root@<TV-IP> "luna-send -n 1 luna://com.webos.applicationManager/launch '{\"id\":\"org.minimal.home\"}'"

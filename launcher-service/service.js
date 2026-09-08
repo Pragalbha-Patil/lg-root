@@ -4,7 +4,11 @@ var LOG = '/tmp/minhome-svc.log';
 
 function log(o) {
     o.ts = Date.now();
-    try { fs.appendFileSync(LOG, JSON.stringify(o) + '\n'); } catch (e) {}
+    try {
+        var line = JSON.stringify(o) + '\n';
+        fs.appendFileSync(LOG, line);
+        try { if (fs.statSync(LOG).size > 100000) fs.writeFileSync(LOG, line); } catch (e) {}
+    } catch (e) {}
 }
 
 var USAGE_FILE = require('path').join(__dirname, 'usage.json');
@@ -39,16 +43,11 @@ var ALLOW_SYSTEM = ['com.webos.app.livetv',
     'com.webos.app.hdmi1', 'com.webos.app.hdmi2', 'com.webos.app.hdmi3', 'com.webos.app.hdmi4',
     'com.webos.app.mediadiscovery', 'com.webos.app.discovery'];
 
-function safeIcon(id) {
-    return 'icons/' + String(id).replace(/[^a-zA-Z0-9._-]/g, '_') + '.png';
-}
-
 service.register('getTiles', function (msg) {
     try {
         service.call('luna://com.webos.applicationManager/listLaunchPoints', {}, function (res) {
             try {
                 var p = (res && res.payload) || {};
-                log({ m: 'getTiles-raw', keys: Object.keys(p), rv: p.returnValue, errText: (p.errorText || '').slice(0, 120) });
                 var usage = loadUsage();
                 var out = [];
                 (p.launchPoints || []).forEach(function (lp) {
@@ -57,7 +56,7 @@ service.register('getTiles', function (msg) {
                     out.push({
                         id: lp.id,
                         title: lp.title || lp.id,
-                        icon: (lp.largeIcon || lp.icon) ? safeIcon(lp.id) : '',
+                        icon: lp.largeIcon || lp.icon || '',
                         params: (lp.params && Object.keys(lp.params).length) ? lp.params : null
                     });
                 });
