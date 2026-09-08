@@ -14,7 +14,7 @@ APP_DIR = os.path.join(BASE, "launcher-app")
 SVC_DIR = os.path.join(BASE, "launcher-service")
 SELF = "org.minimal.home"
 SETTINGS_ID = "com.palm.app.settings"
-SETTINGS_ICON = "/usr/palm/applications/com.palm.app.settings/icon.png"
+SETTINGS_ICON = "icons/com.palm.app.settings.png"
 LG_HOME_ID = "__LGHOME__"
 
 DEFAULTS = {

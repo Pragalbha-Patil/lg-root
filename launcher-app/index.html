@@ -61,7 +61,7 @@ h1 b{font-weight:700}
 <div class="row" id="sysrow">
 <div class="tile" tabindex="0" role="button" data-id="com.webos.app.discovery" data-params=""><div class="art"><img src="/mnt/otncabi/usr/palm/applications/com.webos.app.discovery/asset/hd1080/lgstore_130x130.png" alt="" data-title="Apps"></div><div class="label">Apps</div></div>
 <div class="tile" tabindex="0" role="button" data-id="com.webos.app.mediadiscovery" data-params=""><div class="art"><img src="/usr/palm/applications/com.webos.app.mediadiscovery/icon.png" alt="" data-title="Media Player"></div><div class="label">Media Player</div></div>
-<div class="tile" tabindex="0" role="button" data-id="com.palm.app.settings" data-params=""><div class="art"><img src="/usr/palm/applications/com.palm.app.settings/icon.png" alt="" data-title="Settings"></div><div class="label">Settings</div></div>
+<div class="tile" tabindex="0" role="button" data-id="com.palm.app.settings" data-params=""><div class="art"><img src="icons/com.palm.app.settings.png" alt="" data-title="Settings"></div><div class="label">Settings</div></div>
 <div class="tile" tabindex="0" role="button" data-id="__LGHOME__" data-params=""><div class="art"><div class="initial">L</div></div><div class="label">LG Home</div></div>
 </div>
 <div id="err"></div>
@@ -137,7 +137,7 @@ function tileEl(t){
 }
 var INPUT_IDS = ["com.webos.app.livetv", "com.webos.app.hdmi1", "com.webos.app.hdmi2", "com.webos.app.hdmi3", "com.webos.app.hdmi4"];
 var SYS_IDS = ["com.webos.app.discovery", "com.webos.app.mediadiscovery", "com.palm.app.settings"];
-var SETTINGS_TILE = {"id": "com.palm.app.settings", "title": "Settings", "icon": "/usr/palm/applications/com.palm.app.settings/icon.png", "params": null};
+var SETTINGS_TILE = {"id": "com.palm.app.settings", "title": "Settings", "icon": "icons/com.palm.app.settings.png", "params": null};
 function rebuild(tiles){
   var grid = document.getElementById("grid");
   var inputs = document.getElementById("inputs");

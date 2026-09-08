@@ -162,6 +162,14 @@ can't drift:
 Add a `com.webos.app.*` id to `inputs` or `system` if you want a particular system app to appear
 as a tile. `inputs` row order follows the array, `system` lets the Settings tile be optional.
 
+### Icons
+
+The app runs from `file://` and its webview refuses absolute filesystem paths in `<img src>`
+(outside the app's own directory), so icon file paths from launch points can't be referenced
+directly. Instead the **watcher** — which runs unconfined — copies every launch point's icon into
+`org.minimal.home/icons/<id>.png`, and `getTiles` returns those app-relative paths. The watcher
+re-provisions icons every 5 minutes, so newly installed apps get icons automatically.
+
 ### Most-recently-used ordering
 
 `launcher-service/service.js` records every successful app launch to `usage.json` next to the

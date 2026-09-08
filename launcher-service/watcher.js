@@ -5,8 +5,11 @@
 // No polling: zero CPU when idle, reacts instantly.
 const { execFile, spawn } = require('child_process');
 const fs = require('fs');
-const { BYPASS_FILE, WATCH_LOG: LOG, HOME_ID, SELF_ID } = require('./constants');
+const path = require('path');
+const { BYPASS_FILE, WATCH_LOG: LOG, HOME_ID, SELF_ID, APP_DIR, SETTINGS_ID, SETTINGS_ICON } = require('./constants');
 
+const ICON_DIR = path.join(APP_DIR, 'icons');
+const ICON_MAX_BYTES = 300000;
 const FIRSTUSE = '/var/luna/preferences/ran-firstuse';
 
 let fails = 0;
@@ -30,6 +33,59 @@ function lunaLaunch(id) {
                 try { resolve(JSON.parse(stdout)); } catch (e) { resolve(null); }
             });
     });
+}
+
+function listLaunchPoints() {
+    return new Promise((resolve) => {
+        execFile('luna-send', ['-n', '1', 'luna://com.webos.applicationManager/listLaunchPoints', '{}'],
+            { timeout: 20000 }, (err, stdout) => {
+                if (err) return resolve([]);
+                try {
+                    const p = JSON.parse(stdout);
+                    resolve((p && p.launchPoints) || []);
+                } catch (e) { resolve([]); }
+            });
+    });
+}
+
+function provisionIcons(lps) {
+    let ok = 0, total = 0;
+    try { fs.mkdirSync(ICON_DIR, { recursive: true }); } catch (e) {}
+    (lps || []).forEach((lp) => {
+        if (!lp || !lp.id) return;
+        const dst = path.join(ICON_DIR, lp.id.replace(/[\/\\]/g, '_') + '.png');
+        const src = lp.largeIcon || lp.icon || '';
+        total++;
+        let good = false;
+        if (src) {
+            try {
+                const b = fs.readFileSync(src);
+                if (b.length && b.length <= ICON_MAX_BYTES) {
+                    fs.writeFileSync(dst, b);
+                    good = true;
+                }
+            } catch (e) { good = false; }
+        }
+        if (good) ok++;
+        else { try { fs.unlinkSync(dst); } catch (e) {} }
+    });
+    log({ m: 'icon-prov', total, ok });
+}
+
+function provisionSettingsIcon() {
+    try {
+        const dst = path.join(ICON_DIR, SETTINGS_ID + '.png');
+        const b = fs.readFileSync(SETTINGS_ICON);
+        if (b.length && b.length <= ICON_MAX_BYTES) fs.writeFileSync(dst, b);
+    } catch (e) { log({ provErr: 'settings:' + String((e && e.code) || e) }); }
+}
+
+async function runProvision() {
+    try {
+        const lps = await listLaunchPoints();
+        provisionIcons(lps);
+        provisionSettingsIcon();
+    } catch (e) { log({ provErr: String((e && e.message) || e) }); }
 }
 
 async function redirectLoop() {
@@ -122,5 +178,8 @@ function watch() {
     child.on('close', (code) => reconnect('close:' + code));
     child.stderr.on('data', (d) => { log({ childStderr: ('' + d).slice(0, 200) }); });
 }
+
+setTimeout(runProvision, 15000);
+setInterval(runProvision, 5 * 60 * 1000);
 
 watch();

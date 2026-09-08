@@ -118,14 +118,14 @@ class TemplateTest(unittest.TestCase):
         appinfo = json.loads(out["launcher-app/appinfo.json"])
         self.assertEqual(appinfo["version"], bl.load_config().get("version", "1.0.0"))
 
-    def test_no_nonexistent_icons_dir(self):
+    def test_no_ghost_icons(self):
         out, _, _ = bl.build()
-        self.assertNotIn('src="icons/', out["launcher-app/index.html"])
+        self.assertNotIn('src="icons/settings.png"', out["launcher-app/index.html"])
 
-    def test_settings_tile_uses_real_path(self):
+    def test_settings_tile_uses_provisioned_icon(self):
         out, _, _ = bl.build()
-        self.assertIn("com.palm.app.settings/icon.png", out["launcher-app/index.html"])
-        self.assertNotIn("SETTINGS_TILE = {\"id\":\"com.palm.app.settings\",\"title\":\"Settings\",\"icon\":\"icons/settings.png\"",
+        self.assertIn("icons/com.palm.app.settings.png", out["launcher-app/index.html"])
+        self.assertNotIn("/usr/palm/applications/com.palm.app.settings/icon.png",
                          out["launcher-app/index.html"])
 
 

@@ -67,7 +67,7 @@ service.register('getTiles', function (msg) {
                     out.push({
                         id: lp.id,
                         title: lp.title || lp.id,
-                        icon: lp.largeIcon || lp.icon || '',
+                        icon: ICONS_PREFIX + lp.id + '.png',
                         params: (lp.params && Object.keys(lp.params).length) ? lp.params : null
                     });
                 });
@@ -86,6 +86,8 @@ service.register('getTiles', function (msg) {
         msg.respond({ returnValue: false, errorText: String((e && e.message) || e) });
     }
 });
+
+var ICONS_PREFIX = 'icons/';
 
 var LAUNCH_PARAM_ALLOW = ['PhysicalAddress', 'uniqueId', 'value', 'displayId'];
 var CALLER = 'org.minimal.home';

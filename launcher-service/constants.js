@@ -4,6 +4,7 @@
 var SELF_ID = 'org.minimal.home';
 var HOME_ID = 'com.webos.app.home';
 var SETTINGS_ID = 'com.palm.app.settings';
+var SETTINGS_ICON = '/usr/palm/applications/com.palm.app.settings/icon.png';
 var LG_HOME_TILE_ID = '__LGHOME__';
 
 // appinfo.json lives next to the app assets.
@@ -20,6 +21,7 @@ module.exports = {
   SELF_ID: SELF_ID,
   HOME_ID: HOME_ID,
   SETTINGS_ID: SETTINGS_ID,
+  SETTINGS_ICON: SETTINGS_ICON,
   LG_HOME_TILE_ID: LG_HOME_TILE_ID,
   APP_DIR: APP_DIR,
   SVC_DIR: SVC_DIR,
