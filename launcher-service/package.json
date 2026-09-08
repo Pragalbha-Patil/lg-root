@@ -1,0 +1,4 @@
+{
+    "name": "org.minimal.home.service",
+    "main": "service.js"
+}

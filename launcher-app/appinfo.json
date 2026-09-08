@@ -1,0 +1,15 @@
+{
+  "id": "org.minimal.home",
+  "version": "1.0.2",
+  "vendor": "local",
+  "title": "Minimal Home",
+  "icon": "icon.png",
+  "main": "index.html",
+  "type": "web",
+  "appDescription": "Minimal ad-free launcher: apps and inputs only",
+  "iconColor": "#0b0e14",
+  "visible": true,
+  "noSplashOnLaunch": true,
+  "keepAlive": true,
+  "closeOnBackground": false
+}

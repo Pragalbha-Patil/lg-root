@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Minimal Home</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:#0b0d11;color:#f2f4f8;font-family:"LG Smart UI","Segoe UI",Arial,sans-serif;padding:54px 76px 40px;overflow:hidden}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;
+background:radial-gradient(1400px 600px at 50% -10%,rgba(255,255,255,.045),transparent 60%)}
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:30px;position:relative}
+h1{font-size:34px;font-weight:200;letter-spacing:3px;color:#e8ecf1}
+h1 b{font-weight:700}
+.hright{display:flex;align-items:center;gap:28px}
+#settingsBtn{display:flex;align-items:center;gap:11px;background:rgba(255,255,255,.08);border:3px solid transparent;border-radius:999px;color:#d8dee7;font-size:19px;padding:11px 26px 11px 20px;cursor:pointer;transition:transform .13s,background .13s,border-color .13s}
+#settingsBtn .gear{font-size:22px}
+#settingsBtn:focus{outline:none;background:rgba(255,255,255,.15);border-color:#fff;box-shadow:0 10px 30px rgba(0,0,0,.5);color:#fff}
+#clock{font-size:42px;font-weight:200;color:#c3ccd8;text-align:right;line-height:1.1;min-width:210px}
+#clock small{display:block;font-size:16px;color:#6b7686;margin-top:2px}
+.section{font-size:18px;font-weight:500;letter-spacing:2px;color:#aeb8c6;margin:34px 0 18px;position:relative}
+.row{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:34px 36px;position:relative}
+.tile{background:#16181e;border:3px solid transparent;border-radius:22px;padding:0;cursor:pointer;overflow:hidden;transition:transform .13s ease,background .13s ease,border-color .13s ease,box-shadow .13s ease}
+.tile .art{aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;background:linear-gradient(150deg,#1e222b,#12141a)}
+.tile .art img{width:104px;height:104px;object-fit:contain;filter:drop-shadow(0 8px 18px rgba(0,0,0,.55))}
+.tile .initial{width:104px;height:104px;border-radius:24px;display:flex;align-items:center;justify-content:center;font-size:48px;font-weight:700;background:#232936;color:#93a3ba}
+.tile .label{font-size:22px;font-weight:400;color:#d6dce5;text-align:center;padding:15px 12px 17px;background:rgba(255,255,255,.035);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile:focus{outline:none;background:#1b1f27;border-color:#fff;transform:scale(1.06);box-shadow:0 18px 44px rgba(0,0,0,.6)}
+.tile:focus .label{color:#fff;font-weight:600}
+#status{position:fixed;bottom:24px;left:76px;color:#5d6b7d;font-size:16px}
+#err{display:none;margin-top:40px;font-size:20px;color:#ff9a9a}
+</style>
+</head>
+<body>
+<header>
+<h1>WELCOME <b>Minimal Home</b></h1>
+<div class="hright">
+<div id="settingsBtn" class="tile" tabindex="0" role="button" aria-label="Settings"><span class="gear">&#9881;</span><span>Settings</span></div>
+<div id="clock">--:--<small></small></div>
+</div>
+</header>
+<div class="section">Apps</div>
+<div class="row" id="grid">
+<div class="tile" tabindex="0" role="button" data-id="youtube.leanback.v4" data-params=""><div class="art"><img src="icons/youtube.leanback.v4.png" alt="" data-title="YouTube"></div><div class="label">YouTube</div></div>
+<div class="tile" tabindex="0" role="button" data-id="netflix" data-params=""><div class="art"><img src="icons/netflix.png" alt="" data-title="Netflix"></div><div class="label">Netflix</div></div>
+<div class="tile" tabindex="0" role="button" data-id="amazon" data-params=""><div class="art"><img src="icons/amazon.png" alt="" data-title="Prime Video"></div><div class="label">Prime Video</div></div>
+<div class="tile" tabindex="0" role="button" data-id="io.strem.tv" data-params=""><div class="art"><img src="icons/io.strem.tv.png" alt="" data-title="Stremio"></div><div class="label">Stremio</div></div>
+<div class="tile" tabindex="0" role="button" data-id="org.mariotaku.ihsplay" data-params=""><div class="art"><img src="icons/org.mariotaku.ihsplay.png" alt="" data-title="IHSplay"></div><div class="label">IHSplay</div></div>
+<div class="tile" tabindex="0" role="button" data-id="org.litefin.app" data-params=""><div class="art"><img src="icons/org.litefin.app.png" alt="" data-title="Jellyfin (Litefin)"></div><div class="label">Jellyfin (Litefin)</div></div>
+<div class="tile" tabindex="0" role="button" data-id="org.webosbrew.hbchannel" data-params=""><div class="art"><img src="icons/org.webosbrew.hbchannel.png" alt="" data-title="Homebrew Channel"></div><div class="label">Homebrew Channel</div></div>
+</div>
+<div class="section">Inputs</div>
+<div class="row" id="inputs">
+<div class="tile" tabindex="0" role="button" data-id="com.webos.app.livetv" data-params=""><div class="art"><img src="icons/com.webos.app.livetv.png" alt="" data-title="Live TV"></div><div class="label">Live TV</div></div>
+<div class="tile" tabindex="0" role="button" data-id="com.webos.app.hdmi1" data-params="{&quot;PhysicalAddress&quot;: &quot;1000&quot;, &quot;id&quot;: &quot;uniqueId&quot;, &quot;value&quot;: &quot;2&quot;}"><div class="art"><img src="icons/com.webos.app.hdmi1.png" alt="" data-title="HDMI 1"></div><div class="label">HDMI 1</div></div>
+<div class="tile" tabindex="0" role="button" data-id="com.webos.app.hdmi2" data-params=""><div class="art"><img src="icons/com.webos.app.hdmi2.png" alt="" data-title="HDMI 2"></div><div class="label">HDMI 2</div></div>
+<div class="tile" tabindex="0" role="button" data-id="com.webos.app.hdmi3" data-params=""><div class="art"><img src="icons/com.webos.app.hdmi3.png" alt="" data-title="HDMI 3"></div><div class="label">HDMI 3</div></div>
+<div class="tile" tabindex="0" role="button" data-id="com.webos.app.hdmi4" data-params=""><div class="art"><img src="icons/com.webos.app.hdmi4.png" alt="" data-title="HDMI 4"></div><div class="label">HDMI 4</div></div>
+</div>
+<div class="section">System</div>
+<div class="row" id="sysrow">
+<div class="tile" tabindex="0" role="button" data-id="com.webos.app.discovery" data-params=""><div class="art"><img src="icons/com.webos.app.discovery.png" alt="" data-title="Apps"></div><div class="label">Apps</div></div>
+<div class="tile" tabindex="0" role="button" data-id="com.webos.app.mediadiscovery" data-params=""><div class="art"><img src="icons/com.webos.app.mediadiscovery.png" alt="" data-title="Media Player"></div><div class="label">Media Player</div></div>
+<div class="tile" tabindex="0" role="button" data-id="com.palm.app.settings" data-params=""><div class="art"><img src="icons/settings.png" alt="" data-title="Settings"></div><div class="label">Settings</div></div>
+<div class="tile" tabindex="0" role="button" data-id="__LGHOME__" data-params=""><div class="art"><div class="initial">L</div></div><div class="label">LG Home</div></div>
+</div>
+<div id="err"></div>
+<div id="status"></div>
+<script src="spatial-nav.js"></script>
+<script>
+(function(){
+"use strict";
+try { if (window.PalmSystem && PalmSystem.stageReady) PalmSystem.stageReady(); } catch (e) {}
+
+var SVC = "luna://org.minimal.home.service";
+var BUILD = "v9-mru"; window.__MHBUILD = BUILD;
+var SVC_LIST_M = "getTiles";
+var SVC_LAUNCH_M = "launchApp";
+var statusEl = document.getElementById("status");
+function status(t){ statusEl.textContent = t; }
+function beacon(o){
+  o.v = 4; o.build = BUILD; o.t = Date.now();
+  try { localStorage.setItem("minhome_diag", JSON.stringify(o)); } catch (e) {}
+}
+function svcCall(uri, method, params, onOk, onErr){
+  window.__mhKeep = window.__mhKeep || [];
+  function done(fn, arg){ try { fn(arg); } catch (e) {} }
+  try {
+    if (navigator.service && navigator.service.request) {
+      var req = navigator.service.request(uri, { method: method, parameters: params || {}, subscribe: false,
+        onSuccess: function(r){ done(onOk, r); }, onFailure: function(e){ done(onErr, e); } });
+      window.__mhKeep.push(req);
+      return;
+    }
+  } catch (e) {}
+  try {
+    var b = new PalmServiceBridge();
+    window.__mhKeep.push(b);
+    b.onservicecallback = function(msg){
+      var d;
+      try { d = JSON.parse(msg); } catch (e) { done(onErr, { errorText: "bad response" }); return; }
+      if (d && d.returnValue === false) done(onErr, d); else done(onOk, d);
+    };
+    b.call(uri + "/" + method, JSON.stringify(params || {}));
+  } catch (e) { done(onErr, { errorText: String((e && e.message) || e) }); }
+}
+function envFacts(){
+  var f = {};
+  try { f.navsvc = typeof navigator.service; } catch (e) { f.navsvc = "err"; }
+  try { f.navreq = typeof (navigator.service && navigator.service.request); } catch (e) { f.navreq = "err"; }
+  try { f.psb = typeof PalmServiceBridge; } catch (e) { f.psb = "err"; }
+  return f;
+}
+function launch(id, params){
+  var p = { id: id };
+  if (params) { for (var k in params) { if (Object.prototype.hasOwnProperty.call(params, k)) p[k] = params[k]; } }
+  svcCall(SVC, SVC_LAUNCH_M, p, function(){}, function(e){
+    var el = document.getElementById("err");
+    el.style.display = "block";
+    el.textContent = "Could not open app: " + ((e && e.errorText) || "unknown error");
+  });
+}
+function tileParams(el){
+  try { return JSON.parse(el.getAttribute("data-params") || "null"); } catch (e) { return null; }
+}
+function tileEl(t){
+  var d = document.createElement("div");
+  d.className = "tile"; d.tabIndex = 0;
+  d.setAttribute("role", "button");
+  d.setAttribute("data-id", t.id);
+  try { d.setAttribute("data-params", t.params ? JSON.stringify(t.params) : ""); } catch (e) {}
+  var art = document.createElement("div");
+  art.className = "art";
+  if (t.icon) {
+    var img = document.createElement("img");
+    img.src = t.icon; img.alt = "";
+    img.setAttribute("data-title", t.title || t.id);
+    img.addEventListener("error", function(){
+      try { art.replaceChild(mkInitialEl(t.title), img); } catch (e) {}
+    });
+    art.appendChild(img);
+  } else {
+    art.appendChild(mkInitialEl(t.title));
+  }
+  d.appendChild(art);
+  var s = document.createElement("span");
+  s.className = "label"; s.textContent = t.title || t.id;
+  d.appendChild(s);
+  d.addEventListener("click", function(){ doLaunch(d); });
+  return d;
+}
+var INPUT_IDS = ["com.webos.app.livetv","com.webos.app.hdmi1","com.webos.app.hdmi2","com.webos.app.hdmi3","com.webos.app.hdmi4"];
+var SYS_IDS = ["com.webos.app.discovery","com.webos.app.mediadiscovery","com.palm.app.settings"];
+var SETTINGS_TILE = { id: "com.palm.app.settings", title: "Settings", icon: "icons/settings.png", params: null };
+function rebuild(tiles){
+  var grid = document.getElementById("grid");
+  var inputs = document.getElementById("inputs");
+  var sysrow = document.getElementById("sysrow");
+  grid.innerHTML = ""; inputs.innerHTML = ""; sysrow.innerHTML = "";
+  var added = { grid: 0, inputs: 0, sys: 0 };
+  tiles.forEach(function(t){
+    if (!t || !t.id || t.id === "org.minimal.home") return;
+    var el = tileEl(t);
+    if (INPUT_IDS.indexOf(t.id) >= 0) { inputs.appendChild(el); added.inputs++; }
+    else if (SYS_IDS.indexOf(t.id) >= 0) { sysrow.appendChild(el); added.sys++; }
+    else { grid.appendChild(el); added.grid++; }
+  });
+  if (!sysrow.querySelector('[data-id="com.palm.app.settings"]')) sysrow.appendChild(tileEl(SETTINGS_TILE));
+  var first = document.querySelector("#grid .tile");
+  try { if (first && !document.activeElement) first.focus(); } catch (e) {}
+  return added;
+}
+function doLaunch(el){
+  var id = el.getAttribute("data-id");
+  if (!id) return;
+  if (id === "__LGHOME__") { svcCall(SVC, "openLGHome", {}, function(){}, function(){}); return; }
+  launch(id, tileParams(el));
+}
+function openSettings(){ launch("com.palm.app.settings", null); }
+function mkInitialEl(title){
+  var d = document.createElement("div");
+  d.className = "initial";
+  d.textContent = ((title || "?").trim().charAt(0) || "?").toUpperCase();
+  return d;
+}
+Array.prototype.forEach.call(document.querySelectorAll(".tile img[data-title]"), function(img){
+  img.addEventListener("error", function(){
+    try { img.parentNode.replaceChild(mkInitialEl(img.getAttribute("data-title")), img); } catch (e) {}
+  });
+});
+document.addEventListener("keydown", function(e){
+  if (e.keyCode === 13) {
+    var el0 = document.activeElement;
+    if (!el0) return;
+    if (el0.id === "settingsBtn") { openSettings(); return; }
+    if (el0.className && el0.className.indexOf("tile") >= 0) doLaunch(el0);
+    return;
+  }
+  var dir = (e.keyCode === 37) ? "left" : (e.keyCode === 39) ? "right" : (e.keyCode === 38) ? "up" : (e.keyCode === 40) ? "down" : null;
+  if (!dir) return;
+  var tiles = Array.prototype.slice.call(document.querySelectorAll(".tile"));
+  var cur = tiles.indexOf(document.activeElement);
+  if (cur < 0) { var g0 = document.querySelector("#grid .tile"); (g0 || tiles[0]).focus(); e.preventDefault(); return; }
+  var r0 = tiles[cur].getBoundingClientRect();
+  var cx0 = r0.left + r0.width / 2, cy0 = r0.top + r0.height / 2;
+  var best = -1, bestScore = Infinity, i, r, cx, cy, dx, dy, primary, secondary, score;
+  for (i = 0; i < tiles.length; i++) {
+    if (i === cur) continue;
+    r = tiles[i].getBoundingClientRect();
+    cx = r.left + r.width / 2; cy = r.top + r.height / 2;
+    dx = cx - cx0; dy = cy - cy0;
+    if (dir === "left" && dx >= -4) continue;
+    if (dir === "right" && dx <= 4) continue;
+    if (dir === "up" && dy >= -4) continue;
+    if (dir === "down" && dy <= 4) continue;
+    if (dir === "left" || dir === "right") { primary = Math.abs(dx); secondary = Math.abs(dy); }
+    else { primary = Math.abs(dy); secondary = Math.abs(dx); }
+    score = primary + secondary * 2.2;
+    if (score < bestScore) { bestScore = score; best = i; }
+  }
+  e.preventDefault();
+  if (best >= 0) {
+    tiles[best].focus();
+    try { tiles[best].scrollIntoView({ block: "nearest" }); } catch (e2) {}
+  }
+});
+var sb = document.getElementById("settingsBtn");
+sb.addEventListener("click", openSettings);
+Array.prototype.forEach.call(document.querySelectorAll("#grid .tile, #inputs .tile, #sysrow .tile"), function(el){
+  el.addEventListener("click", function(){ doLaunch(el); });
+});
+function tick(){
+  var n = new Date(), p = function(x){ return (x < 10 ? "0" : "") + x; };
+  var days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  var h = n.getHours(), ap = h >= 12 ? "PM" : "AM";
+  h = h % 12; if (h === 0) h = 12;
+  document.getElementById("clock").innerHTML =
+    h + ":" + p(n.getMinutes()) + " " + ap +
+    "<small>" + days[n.getDay()] + " " + p(n.getDate()) + "." + p(n.getMonth() + 1) + "</small>";
+}
+tick(); setInterval(tick, 15000);
+beacon({ live: false, n: document.querySelectorAll("#grid .tile, #inputs .tile, #sysrow .tile").length, err: "boot-baked", env: envFacts() });
+var tries = 0;
+function refresh(){
+  tries++;
+  svcCall(SVC, SVC_LIST_M, {},
+    function(d){
+      if (d && d.tiles && d.tiles.length) { rebuild(d.tiles); beacon({ live: true, n: d.tiles.length, err: "" }); }
+      else if (tries < 6) { setTimeout(refresh, 2500); }
+      else { beacon({ live: false, n: 0, err: "empty-list" }); }
+    },
+    function(e){
+      if (tries < 6) { setTimeout(refresh, 2500); return; }
+      beacon({ live: false, n: 0, err: String((e && e.errorText) || e || "unknown") });
+    });
+}
+refresh();
+
+function probeBeacon(o){
+  o.v = 4; o.t = Date.now();
+  try { localStorage.setItem("minhome_probe", JSON.stringify(o)); } catch (e) {}
+}
+setTimeout(function(){
+  svcCall("luna://com.webos.applicationManager", "launch", { id: "org.minimal.home.probe-nonexistent-xyz" },
+    function(d){ probeBeacon({ probe: "launch", via: "ok-cb", res: JSON.stringify(d).slice(0, 120) }); },
+    function(e){ probeBeacon({ probe: "launch", via: "err-cb", res: JSON.stringify(e).slice(0, 120) }); });
+}, 4000);
+var first = document.querySelector("#grid .tile");
+if (first) first.focus();
+document.addEventListener("visibilitychange", function(){
+  if (!document.hidden) { tries = 0; refresh(); }
+});
+window.addEventListener("focus", function(){ tries = 0; refresh(); });
+})();
+</script>
+</body>
+</html>

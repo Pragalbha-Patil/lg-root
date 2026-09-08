@@ -1,0 +1,150 @@
+{
+    "subscribed": false,
+    "returnValue": true,
+    "launchPoints": [
+        {
+            "title": "YouTube",
+            "id": "youtube.leanback.v4",
+            "systemApp": false,
+            "hidden": false,
+            "icon": "/media/cryptofs/apps/usr/palm/applications/youtube.leanback.v4/yt_lg_80x80.png",
+            "largeIcon": "/media/cryptofs/apps/usr/palm/applications/youtube.leanback.v4/yt_lg_130x130.png",
+            "params": {},
+            "removable": true
+        },
+        {
+            "title": "Netflix",
+            "id": "netflix",
+            "systemApp": false,
+            "hidden": false,
+            "icon": "/media/cryptofs/apps/usr/palm/applications/netflix/SMALL_APP_ICON.png",
+            "largeIcon": "/media/cryptofs/apps/usr/palm/applications/netflix/LARGE_APP_ICON.png",
+            "params": {},
+            "removable": true
+        },
+        {
+            "title": "Prime Video",
+            "id": "amazon",
+            "systemApp": false,
+            "hidden": false,
+            "icon": "/media/cryptofs/apps/usr/palm/applications/amazon/aiv_white_80x80.png",
+            "largeIcon": "/media/cryptofs/apps/usr/palm/applications/amazon/aiv_white_130x130.png",
+            "params": {},
+            "removable": true
+        },
+        {
+            "title": "Stremio",
+            "id": "io.strem.tv",
+            "systemApp": false,
+            "hidden": false,
+            "icon": "/media/cryptofs/apps/usr/palm/applications/io.strem.tv/icon.png",
+            "largeIcon": "/media/cryptofs/apps/usr/palm/applications/io.strem.tv/largeIcon.png",
+            "params": {},
+            "removable": true
+        },
+        {
+            "title": "Jellyfin (Litefin)",
+            "id": "org.litefin.app",
+            "systemApp": false,
+            "hidden": false,
+            "icon": "/media/developer/apps/usr/palm/applications/org.litefin.app/assets/icon-80.png",
+            "largeIcon": "/media/developer/apps/usr/palm/applications/org.litefin.app/assets/icon-130.png",
+            "params": {},
+            "removable": true
+        },
+        {
+            "title": "IHSplay",
+            "id": "org.mariotaku.ihsplay",
+            "systemApp": false,
+            "hidden": false,
+            "icon": "/media/developer/apps/usr/palm/applications/org.mariotaku.ihsplay/icon.png",
+            "largeIcon": "/media/developer/apps/usr/palm/applications/org.mariotaku.ihsplay/largeIcon.png",
+            "params": {},
+            "removable": true
+        },
+        {
+            "title": "Homebrew Channel",
+            "id": "org.webosbrew.hbchannel",
+            "systemApp": false,
+            "hidden": false,
+            "icon": "/media/developer/apps/usr/palm/applications/org.webosbrew.hbchannel/assets/icon80.png",
+            "largeIcon": "/media/developer/apps/usr/palm/applications/org.webosbrew.hbchannel/assets/icon130.png",
+            "params": {},
+            "removable": true
+        },
+        {
+            "title": "Live TV",
+            "id": "com.webos.app.livetv",
+            "systemApp": true,
+            "hidden": false,
+            "icon": "/usr/palm/applications/com.webos.app.livetv/assets/icon_livetv_80.png",
+            "largeIcon": "/usr/palm/applications/com.webos.app.livetv/assets/icon_livetv_130.png",
+            "params": {},
+            "removable": false
+        },
+        {
+            "title": "HDMI 1",
+            "id": "com.webos.app.hdmi1",
+            "systemApp": false,
+            "hidden": false,
+            "icon": "/usr/palm/plugins/inputapps/assets/home/miniicon/HDMI_1.png",
+            "largeIcon": "/usr/palm/plugins/inputapps/assets/home/largeIcon/HDMI_1.png",
+            "params": {
+                "PhysicalAddress": "1000",
+                "id": "uniqueId",
+                "value": "2"
+            },
+            "removable": false
+        },
+        {
+            "title": "HDMI 2",
+            "id": "com.webos.app.hdmi2",
+            "systemApp": false,
+            "hidden": false,
+            "icon": "/usr/palm/plugins/inputapps/assets/home/miniicon/HDMI_2.png",
+            "largeIcon": "/usr/palm/plugins/inputapps/assets/home/largeIcon/HDMI_2.png",
+            "params": {},
+            "removable": false
+        },
+        {
+            "title": "HDMI 3",
+            "id": "com.webos.app.hdmi3",
+            "systemApp": false,
+            "hidden": false,
+            "icon": "/usr/palm/plugins/inputapps/assets/home/miniicon/HDMI_3.png",
+            "largeIcon": "/usr/palm/plugins/inputapps/assets/home/largeIcon/HDMI_3.png",
+            "params": {},
+            "removable": false
+        },
+        {
+            "title": "HDMI 4",
+            "id": "com.webos.app.hdmi4",
+            "systemApp": false,
+            "hidden": false,
+            "icon": "/usr/palm/plugins/inputapps/assets/home/miniicon/HDMI_4.png",
+            "largeIcon": "/usr/palm/plugins/inputapps/assets/home/largeIcon/HDMI_4.png",
+            "params": {},
+            "removable": false
+        },
+        {
+            "title": "Apps",
+            "id": "com.webos.app.discovery",
+            "systemApp": true,
+            "hidden": false,
+            "icon": "/mnt/otncabi/usr/palm/applications/com.webos.app.discovery/asset/hd1080/lgstore.png",
+            "largeIcon": "/mnt/otncabi/usr/palm/applications/com.webos.app.discovery/asset/hd1080/lgstore_130x130.png",
+            "params": {},
+            "removable": false
+        },
+        {
+            "title": "Media Player",
+            "id": "com.webos.app.mediadiscovery",
+            "systemApp": true,
+            "hidden": false,
+            "icon": "/usr/palm/applications/com.webos.app.mediadiscovery/icon.png",
+            "largeIcon": "/usr/palm/applications/com.webos.app.mediadiscovery/icon.png",
+            "params": {},
+            "removable": false
+        }
+    ]
+}

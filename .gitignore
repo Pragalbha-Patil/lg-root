@@ -1,0 +1,22 @@
+# Dev-only scratch, tooling, backups and session logs — never published.
+# Everything in here is personal working state (scripts with hardcoded TV
+# addresses/credentials, command history, TV backups, etc).
+private/
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Runtime state pulled back from the TV (MRU usage data)
+launcher-app/usage.json
+
+# Operation / debug logs
+tv-ops-log.txt
+*.log
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/

@@ -1,0 +1,9 @@
+{
+    "id": "org.minimal.home.service",
+    "description": "Minimal Home launcher relay service",
+    "services": [
+        {
+            "name": "org.minimal.home.service"
+        }
+    ]
+}
