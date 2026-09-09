@@ -53,7 +53,7 @@ body.density-large {
   --tile-label: 26px;
   --grid-min: 368px;
 }
-body.no-labels .label {
+body.no-labels .tile .label {
   display: none;
 }
 header {
@@ -1134,6 +1134,7 @@ window.MH_CONFIG = {"version": "v1.4.1", "system": ["com.webos.app.discovery", "
     d.className = t.pinned ? "tile pinned" : "tile";
     d.tabIndex = 0;
     d.setAttribute("role", "button");
+    d.setAttribute("aria-label", t.title || t.id);
     d.setAttribute("data-id", t.id);
     try {
       d.setAttribute("data-params", t.params ? JSON.stringify(t.params) : "");
