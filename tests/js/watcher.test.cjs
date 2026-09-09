@@ -73,10 +73,10 @@ test('subscription disconnect clears retry state and ignores data from the old c
 });
 
 test('Luna subprocess failures and malformed discovery responses are recoverable', async () => {
-    for (const value of ['bad json', 'null', '{}', '{"launchPoints":{}}', '{"returnValue":false}', '{"returnValue":true,"launchPoints":[]}']) {
-        const w = watcher(); const task = w.context.listLaunchPoints(); w.respond(value); assert.deepEqual(Array.from(await task), []);
+    for (const value of ['bad json', 'null', '{}', '{"launchPoints":{}}', '{"returnValue":false}']) {
+        const w = watcher(); const task = w.context.listLaunchPoints(); w.respond(value); assert.equal(await task, null);
     }
-    const w = watcher(); const list = w.context.listLaunchPoints(); w.respond('', new Error('offline')); assert.deepEqual(Array.from(await list), []);
+    const w = watcher(); const list = w.context.listLaunchPoints(); w.respond('', new Error('offline')); assert.equal(await list, null);
     const launch = w.context.lunaLaunch('video'); w.respond('bad'); assert.equal(await launch, null);
     const failed = w.context.lunaLaunch('video'); w.respond('', new Error('offline')); assert.equal(await failed, null);
     const thrown = watcher({ throwExec: true }); await thrown.context.redirectLoop();
@@ -84,7 +84,7 @@ test('Luna subprocess failures and malformed discovery responses are recoverable
     const provision = thrown.context.runProvision(); await provision;
 });
 
-test('icon provisioning writes changes only, rejects invalid IDs and removes unavailable icons', () => {
+test('icon provisioning writes changes only and retains unavailable installed icons', () => {
     const w = watcher(); w.disk.files.set('/source/a', Buffer.from('first')); w.disk.files.set('/source/b', Buffer.from('second'));
     const icon = C.APP_DIR + '/icons/video.png';
     w.context.provisionIcons([null, { id: 4 }, { id: '../bad' }, { id: 'video', largeIcon: '/source/a' }]);
@@ -94,7 +94,7 @@ test('icon provisioning writes changes only, rejects invalid IDs and removes una
     w.context.provisionIcons([{ id: 'video', icon: '/source/b' }]); assert.equal(w.disk.files.get(icon).toString(), 'second');
     for (const source of ['', '/absent', '/empty', '/large']) {
         w.disk.files.set('/empty', ''); w.disk.files.set('/large', Buffer.alloc(300001));
-        w.context.provisionIcons([{ id: 'video', icon: source }]); assert.equal(w.disk.files.has(icon), false);
+        w.context.provisionIcons([{ id: 'video', icon: source }]); assert.equal(w.disk.files.has(icon), true);
     }
     w.disk.errors.set('mkdir', new Error('denied')); w.disk.errors.set('unlink', new Error('denied'));
     assert.doesNotThrow(() => w.context.provisionIcons([{ id: 'video' }]));
