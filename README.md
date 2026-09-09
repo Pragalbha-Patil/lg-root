@@ -30,20 +30,30 @@ module, and the required Luna service registration and permissions. This project
 does not root your TV. Device notes cover webOS 10.3.1; there is no verified
 compatibility matrix across TV models or firmware.
 
+### Build or update an existing installation
+
+This path needs Python and Git, not Node/npm on your computer. Upload also needs
+a POSIX shell and SSH/SCP; see the installation guide for registration and backups.
+
 ```sh
 git clone https://github.com/Pragalbha-Patil/webos-minimal-home.git
 cd webos-minimal-home
-npm ci --ignore-scripts
 python build_launcher.py
-python tools/check.py
 ```
+
+### Desktop preview
 
 For a desktop preview, first run `python build_launcher.py --preview`, then
 `python -m http.server 8000 --bind 127.0.0.1` and open
 `http://127.0.0.1:8000/launcher-app/`. The grid and navigation work with the
 sample tiles; app launches and TV settings require Luna on a TV. Some icons
-will be missing until the on-device watcher provisions them. Restore the normal
+are missing because TV-side icon provisioning does not populate your desktop
+checkout. This is a static grid preview, not a simulated Luna service: live search,
+pinning, saving, stats and recovery require a TV or the isolated test harness.
+Restore the normal
 build with `python build_launcher.py` before committing or packaging.
+
+### Upload
 
 For an already registered installation, use a POSIX shell (Git Bash or WSL on Windows):
 
@@ -56,6 +66,18 @@ The installer uploads app/service files and requests launch. **It does not
 register Luna permissions or install a boot hook.** Read the
 [installation and recovery guide](docs/INSTALL.md) before first use. Downloaded
 release archives include their own installation guide and checksum.
+
+### Contribute or run checks
+
+Install the supported host Node.js version and npm development tools first:
+see [contributor setup](CONTRIBUTING.md#local-setup) for exact versions.
+
+```sh
+npm ci --ignore-scripts
+python tools/check.py --require-shell
+```
+
+See [testing](docs/TESTING.md) for Windows guidance and validation commands.
 
 ## Controls and settings
 
