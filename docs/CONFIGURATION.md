@@ -61,10 +61,11 @@ installed manifest or displayed build version. Appearance and clock options
 belong to launcher preferences below.
 
 The initial feature installation needs updated app and relay files and a restart
-of their existing processes; subsequent config edits do not. Uploading a build
-or release overwrites the service config, so keep a backup of TV customizations
-and reapply them afterward. Invalid JSON or invalid field types can leave the
-greeting blank or system apps hidden; restore the backup and refresh if needed.
+of their existing processes; subsequent config edits do not. The bundled installer
+preserves valid TV customizations automatically during updates, merges them with
+new configuration fields, and retains the new release version. Invalid JSON or
+invalid field types stop an installer update before upload; when editing directly,
+they can leave the greeting blank or system apps hidden until corrected.
 
 ## Launcher preferences
 

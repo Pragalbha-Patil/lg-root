@@ -96,7 +96,7 @@ Relaunching requests a live refresh. You can also open another app and return to
 Minimal Home. No service restart or reboot is needed for config edits; the
 foreground screen does not continuously poll the file. See the
 [configuration guide](docs/CONFIGURATION.md#on-tv-configuration) for field behavior
-and update precautions.
+and automatic update preservation.
 
 ## Screenshots
 

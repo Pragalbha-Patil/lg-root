@@ -41,7 +41,8 @@ TV_HOST=mytv sh tools/install.sh
 
 The directory check is read-only and does not prove Luna registration works.
 Normal upload creates missing target directories, builds, checks generated-file
-freshness, stages the runtime file allowlist, uploads it, and requests launch.
+freshness, stages the runtime file allowlist, preserves the installed configuration,
+uploads it, and requests launch.
 SSH/SCP failures and unsuccessful Luna launch replies produce a nonzero exit.
 
 | Variable/option | Purpose |
@@ -55,30 +56,34 @@ SSH/SCP failures and unsuccessful Luna launch replies produce a nonzero exit.
 App and service IDs are fixed in manifests and code. Environment overrides to
 different IDs are rejected. The helper can run from any current directory.
 It preserves TV preferences, usage history, and icons by uploading only shipped
-files. It does not terminate existing processes or replace boot hooks.
+files. If a service-local `config.json` exists, the helper reads and validates it
+before uploading anything, then merges its custom values onto the new schema.
+New fields and the release version are retained automatically. A malformed existing
+config stops the update before TV files change. The helper does not terminate
+existing processes or replace boot hooks.
 
 ## Upload a release archive
 
 On your computer, extract `minimal-home-vVERSION.tar.gz` into an empty directory.
-The archive contains only runtime files, this guide, and the license. If a
-checksum file was downloaded alongside the archive, verify it before extraction:
+The archive contains only runtime files, the installer, this guide, and the
+license. If a checksum file was downloaded alongside the archive, verify it
+before extraction:
 
 ```sh
 sha256sum -c minimal-home-vVERSION.tar.gz.sha256
 tar -xzf minimal-home-vVERSION.tar.gz
 ```
 
-In the extracted directory, replace `mytv` with your SSH alias and upload:
+In the extracted directory, replace `mytv` with your SSH alias and run the bundled
+installer. It provides the same automatic configuration preservation as a source
+checkout:
 
 ```sh
-ssh root@mytv "mkdir -p /media/developer/apps/usr/palm/applications/org.minimal.home /media/developer/apps/usr/palm/services/org.minimal.home.service"
-scp -r launcher-app/. root@mytv:/media/developer/apps/usr/palm/applications/org.minimal.home/
-scp -r launcher-service/. root@mytv:/media/developer/apps/usr/palm/services/org.minimal.home.service/
-ssh root@mytv "luna-send -n 1 luna://com.webos.applicationManager/launch '{\"id\":\"org.minimal.home\"}'"
+TV_HOST=mytv sh tools/install.sh
 ```
 
-Use recursive copies only from the extracted release, whose contents exclude
-personal runtime files. An archive is not an IPK and does not register services.
+The archive contains only allowlisted files, not personal runtime state. It is not
+an IPK and does not register services.
 
 ## Start the watcher
 

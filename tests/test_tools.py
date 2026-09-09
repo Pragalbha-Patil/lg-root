@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -13,7 +14,7 @@ import unittest
 from unittest.mock import patch
 
 import build_launcher as bl
-from tools import check, package
+from tools import check, merge_config, package
 
 ROOT = Path(__file__).resolve().parents[1]
 SHELL = check.find_shell()
@@ -114,7 +115,8 @@ class PackagingTest(unittest.TestCase):
                 self.assertEqual(set(archive.getnames()), set(package.RELEASE_FILES))
                 for entry in archive:
                     self.assertEqual(entry.mtime, 0)
-                    self.assertEqual(entry.mode, 0o644)
+                    expected_mode = 0o755 if entry.name == "tools/install.sh" else 0o644
+                    self.assertEqual(entry.mode, expected_mode)
                     self.assertEqual(archive.extractfile(entry).read(), (root / entry.name).read_bytes())
             checksum = first.with_name(first.name + ".sha256").read_text().split()[0]
             self.assertEqual(checksum, hashlib.sha256(first.read_bytes()).hexdigest())
@@ -139,6 +141,36 @@ class PackagingTest(unittest.TestCase):
             self.assertFalse(destination.exists())
 
 
+class MergeConfigTest(unittest.TestCase):
+    def test_custom_values_survive_and_new_schema_and_version_win(self):
+        new = {
+            "version": "2.0.0",
+            "header": {"text": "Welcome", "brand": "Minimal Home", "style": "new"},
+            "ui": {"system": ["settings"], "appsPriority": [], "newOption": True},
+        }
+        installed = {
+            "version": "1.4.1",
+            "header": {"text": "Hello", "brand": "Living Room"},
+            "ui": {"system": [], "appsPriority": ["custom.app"]},
+            "futureCustom": {"enabled": True},
+        }
+        self.assertEqual(
+            merge_config.merge_configs(new, installed),
+            {
+                "version": "2.0.0",
+                "header": {"text": "Hello", "brand": "Living Room", "style": "new"},
+                "ui": {"system": [], "appsPriority": ["custom.app"], "newOption": True},
+                "futureCustom": {"enabled": True},
+            },
+        )
+
+    def test_invalid_installed_known_fields_are_rejected(self):
+        for installed in ([], {"header": []}, {"header": {"text": False}},
+                          {"ui": []}, {"ui": {"system": [False]}}):
+            with self.subTest(installed=installed), self.assertRaises(ValueError):
+                merge_config.merge_configs({"version": "2.0.0"}, installed)
+
+
 @unittest.skipUnless(SHELL, "POSIX sh is required for installer regression tests")
 class InstallerTest(unittest.TestCase):
     def setUp(self):
@@ -151,7 +183,10 @@ class InstallerTest(unittest.TestCase):
         self.env = dict(os.environ, TV_HOST="example-tv", TV_USER="root",
                         PYTHON=Path(sys.executable).as_posix(), MH_CALL_LOG=self.log.as_posix(),
                         MH_TEST_BIN=self.bin.as_posix(),
-                        MH_RESPONSE='{"returnValue":true}', MH_SSH_EXIT="0", MH_SCP_EXIT="0")
+                        MH_RESPONSE='{"returnValue":true}', MH_SSH_EXIT="0", MH_SCP_EXIT="0",
+                        MH_CONFIG_PRESENT="1",
+                        MH_INSTALLED_CONFIG='{"version":"1.0.0","header":{"text":"Hello TV"},'
+                        '"ui":{"system":[],"appsPriority":["custom.app"]}}')
         self.env.pop("APP_ID", None)
         self.env.pop("SVC_ID", None)
         # Windows runners may use 'Path': duplicate case variants can cause the
@@ -163,7 +198,13 @@ class InstallerTest(unittest.TestCase):
         self.env["PATH"] = os.pathsep.join((str(self.bin), str(Path(SHELL).parent), inherited_path))
         self.stub("ssh", 'printf "ssh\\n" >> "$MH_CALL_LOG"\nprintf "%s\\n" "$@" >> "$MH_CALL_LOG"\n'
                   'if [ "$MH_SSH_EXIT" != 0 ]; then exit "$MH_SSH_EXIT"; fi\n'
-                  'case "$*" in *luna-send*) printf "%s\\n" "$MH_RESPONSE";; esac\n')
+                  'case "$*" in\n'
+                  '  *luna-send*) printf "%s\\n" "$MH_RESPONSE";;\n'
+                  '  *"if test -f"*)\n'
+                  '    if [ "$MH_CONFIG_PRESENT" = 1 ]; then\n'
+                  '      printf "MINIMAL_HOME_CONFIG_PRESENT\\n%s" "$MH_INSTALLED_CONFIG"\n'
+                  '    fi;;\n'
+                  'esac\n')
         self.stub("scp", 'printf "scp\\n" >> "$MH_CALL_LOG"\nprintf "%s\\n" "$@" >> "$MH_CALL_LOG"\n'
                   'exit "$MH_SCP_EXIT"\n')
 
@@ -172,7 +213,7 @@ class InstallerTest(unittest.TestCase):
         path.write_text("#!/bin/sh\nset -eu\n" + body, encoding="utf-8", newline="\n")
         path.chmod(0o755)
 
-    def install(self, *args):
+    def install_script(self, script, *args):
         # Run outside the checkout to catch accidental reliance on cwd.
         # Git for Windows' bin/sh.exe wrapper can prepend its own binaries on
         # startup. Set PATH inside that shell and verify both stubs before any
@@ -186,9 +227,12 @@ class InstallerTest(unittest.TestCase):
             '  fi\ndone\n'
             '. "$0"\n'
         )
-        return subprocess.run([SHELL, "-c", bootstrap, (ROOT / "tools/install.sh").as_posix(), *args],
+        return subprocess.run([SHELL, "-c", bootstrap, script.as_posix(), *args],
                               cwd=self.root, env=self.env, capture_output=True,
                               text=True, encoding="utf-8", timeout=30)
+
+    def install(self, *args):
+        return self.install_script(ROOT / "tools/install.sh", *args)
 
     def test_help_and_unknown_arguments_do_not_contact_tv(self):
         self.env.pop("TV_HOST")
@@ -221,6 +265,38 @@ class InstallerTest(unittest.TestCase):
         payload = command.split("'", 2)[1]
         self.assertEqual(json.loads(payload), {"id": "org.minimal.home"})
         self.assertEqual(self.log.read_text().splitlines().count("scp"), 2)
+        self.assertIn("Preserved installed Minimal Home configuration.", result.stdout)
+
+    def test_bundled_release_installer_preserves_config(self):
+        release = self.root / "release"
+        for name in package.RELEASE_FILES:
+            target = release / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(ROOT / name, target)
+        result = self.install_script(release / "tools/install.sh")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("Preserved installed Minimal Home configuration.", result.stdout)
+        self.assertEqual(self.log.read_text().splitlines().count("scp"), 2)
+
+    def test_missing_config_is_a_first_install(self):
+        self.env["MH_CONFIG_PRESENT"] = "0"
+        result = self.install("--no-build")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("Preserved", result.stdout)
+
+    def test_invalid_installed_config_stops_before_upload(self):
+        self.env["MH_INSTALLED_CONFIG"] = '{"header":{"text":false}}'
+        result = self.install("--no-build")
+        self.assertNotEqual(result.returncode, 0)
+        calls = self.log.read_text()
+        self.assertNotIn("scp", calls)
+        self.assertNotIn("mkdir", calls)
+
+    def test_empty_installed_config_stops_before_upload(self):
+        self.env["MH_INSTALLED_CONFIG"] = ""
+        result = self.install("--no-build")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("scp", self.log.read_text())
 
     def test_upload_failure_prevents_launch(self):
         self.env["MH_SCP_EXIT"] = "1"
