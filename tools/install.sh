@@ -66,8 +66,9 @@ if [ -f build_launcher.py ]; then
     "$PYTHON" tools/package.py --stage "$STAGE_DIR"
 else
     # Release archives already contain only the deployment allowlist.
-    [ -f launcher-app/appinfo.json ] && [ -f launcher-service/config.json ] ||
+    if [ ! -f launcher-app/appinfo.json ] || [ ! -f launcher-service/config.json ]; then
         fail "run the bundled installer from the extracted release directory"
+    fi
     cp -R launcher-app launcher-service "$STAGE_DIR/"
 fi
 
