@@ -131,7 +131,25 @@ before sharing logs. A browser-only preview cannot validate these platform behav
 
 ## Return to stock Home
 
-Use the LG Home tile for a ten-minute bypass. For a lasting rollback, disable
+Use the LG Home tile after successful discovery. If the grid never loads or the
+UI is unusable, but the relay is registered and can launch Home, this
+**state-changing command on the TV** requests the same temporary bypass:
+
+```sh
+luna-send -n 1 luna://org.minimal.home.service/openLGHome '{}'
+```
+
+Require `returnValue: true`. A failed Home launch removes the bypass marker and
+reports an error. If the relay is missing or denied, do not widen permissions;
+use the targeted watcher/boot-hook recovery below.
+
+The bypass stores a wall-clock expiry for ten minutes. It suppresses redirects,
+not a timer that forcibly switches the screen at expiry. A later relevant
+foreground event can resume redirection. Restarting only the webview does not
+cancel the persisted bypass. Stopping the watcher suppresses redirects until
+it is started again; disabling its boot hook also prevents startup on reboot.
+
+For a lasting rollback, disable
 the watcher boot hook you installed and stop its specific process, then launch
 stock Home:
 
