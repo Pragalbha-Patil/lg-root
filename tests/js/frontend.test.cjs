@@ -338,20 +338,21 @@ test('explicit desktop preview tiles retain their click handlers', t => {
 });
 
 
-test('unchanged discovery and preferences preserve tiles, decoded icon fallback and focus', async t => {
+test('unchanged discovery preserves tiles and focus but retries failed icons', async t => {
     const app = appFor(t); ready(app);
     const tile = app.document.querySelector('#grid .tile');
     tile.querySelector('img').dispatchEvent(new app.window.Event('error'));
-    const art = tile.querySelector('.initial');
     tile.focus();
     app.window.dispatchEvent(new app.window.Event('focus'));
     app.tiles({ tiles: [video], inputs: [port] });
     assert.equal(app.document.querySelector('#grid .tile'), tile);
-    assert.equal(tile.querySelector('.initial'), art);
+    assert.ok(tile.querySelector('img'));
+    const retry = tile.querySelector('img');
     assert.equal(app.document.activeElement, tile);
     await app.clock.run(400);
     app.visible(true); app.tiles({ tiles: [video], inputs: [port], prefs: {} });
     assert.equal(app.document.querySelector('#grid .tile'), tile);
+    assert.equal(tile.querySelector('img'), retry, 'successful images are retained');
     await app.clock.run(400);
     app.window.dispatchEvent(new app.window.Event('focus'));
     app.tiles({ tiles: [{ ...video, title: 'Renamed' }], inputs: [port], prefs: {} });
