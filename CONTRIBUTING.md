@@ -55,6 +55,8 @@ tests, JavaScript coverage thresholds, and diff whitespace. Node and npm develop
 tools are mandatory so runtime tests cannot silently skip.
 Use `python tools/check.py --require-shell` for the Linux CI gate. Set `SH` to a
 POSIX shell executable if automatic detection fails.
+The [full CI checklist](docs/TESTING.md#full-ci-checklist) also includes packaging
+and Linux ShellCheck. POSIX sh and ShellCheck are separate prerequisites.
 
 For a focused test while iterating:
 

@@ -28,6 +28,24 @@ node --test tests/js/service.test.cjs
 python -m unittest discover -s tests -p test_build_launcher.py -v
 ```
 
+## Full CI checklist
+
+Formatting and generation above **write files**. The checks below do not change
+tracked sources, although coverage/package checks create local `dist/` output.
+
+| Gate | Local command | Requirements / CI hosts |
+| --- | --- | --- |
+| Shared validation | `python tools/check.py --require-shell` | Python, supported Node, npm dev tools, POSIX sh; Linux and Windows |
+| Runtime packaging | `python tools/package.py` | Python, Git checkout and current generated output; Linux and Windows |
+| Installer shell lint | `shellcheck tools/install.sh` | ShellCheck executable; Linux CI only |
+
+`--require-shell` requires **POSIX sh**, not ShellCheck. It enables `sh -n`
+syntax checks and installer tests; it does not run the separate ShellCheck gate.
+Install ShellCheck separately and use Linux/WSL to reproduce that gate when it
+is not available on your native host. A green shared checker alone does not
+establish that every workflow step passed. See `.github/workflows/ci.yml` for
+the authoritative matrix and `.github/workflows/release.yml` for release gates.
+
 ## Coverage contract
 
 [c8](https://github.com/bcoe/c8) collects
