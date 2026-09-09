@@ -32,7 +32,8 @@ the live relay supplies the configured greeting.
 Inputs are discovered from the TV's launch points. Do not add a fixed HDMI list
 to config. The system allowlist is explicit: an empty list hides all system
 apps, including the Settings tile. The header gear still opens launcher preferences,
-and the LG Home bypass tile remains available.
+and the LG Home bypass tile appears after successful discovery. If discovery
+fails, use the relay/SSH [recovery procedure](INSTALL.md#return-to-stock-home).
 
 ## On-TV configuration
 
@@ -52,7 +53,8 @@ config polling is performed.
 Use strings for both header fields and arrays of app ID strings for both `ui`
 fields. Retain all fields when editing: runtime reads do not merge build defaults.
 An empty `ui.system` hides system apps, including the Settings tile, while the
-header gear and LG Home bypass remain available. IDs only expose apps returned
+header gear remains available. The LG Home tile requires successful discovery;
+the relay/SSH recovery path does not require a loaded grid. IDs only expose apps returned
 by live discovery. `ui.appsPriority` breaks ordering ties after pins and recent
 usage; alphabetical sorting ignores it.
 
