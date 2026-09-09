@@ -400,7 +400,13 @@
     list.sys = reorder(list.sys);
     // Preserve DOM nodes, decoded icons and focus when discovery is unchanged.
     var signature = JSON.stringify(list);
-    if (signature === renderedTiles) return;
+    if (signature === renderedTiles) {
+      list.grid.concat(list.inputs, list.sys).forEach(function (t) {
+        var art = tile4(t.id).querySelector(".art[data-icon-failed]");
+        if (art) tileArt(art, t);
+      });
+      return;
+    }
     renderedTiles = signature;
     grid.innerHTML = "";
     inputs.innerHTML = "";
@@ -428,20 +434,7 @@
     } catch (e) {}
     var art = document.createElement("div");
     art.className = "art";
-    if (t.icon) {
-      var img = document.createElement("img");
-      img.src = t.icon;
-      img.alt = "";
-      img.setAttribute("data-title", t.title || t.id);
-      img.addEventListener("error", function () {
-        try {
-          art.replaceChild(mkInitialEl(t.title), img);
-        } catch (e) {}
-      });
-      art.appendChild(img);
-    } else {
-      art.appendChild(mkInitialEl(t.title));
-    }
+    tileArt(art, t);
     d.appendChild(art);
     var s = document.createElement("div");
     s.className = "label";
@@ -457,6 +450,25 @@
       doLaunch(d);
     });
     return d;
+  }
+  function tileArt(art, t) {
+    art.innerHTML = "";
+    art.removeAttribute("data-icon-failed");
+    if (t.icon) {
+      var img = document.createElement("img");
+      img.src = t.icon;
+      img.alt = "";
+      img.setAttribute("data-title", t.title || t.id);
+      img.addEventListener("error", function () {
+        try {
+          art.replaceChild(mkInitialEl(t.title), img);
+          art.setAttribute("data-icon-failed", "true");
+        } catch (e) {}
+      });
+      art.appendChild(img);
+    } else {
+      art.appendChild(mkInitialEl(t.title));
+    }
   }
   function doLaunch(el) {
     if (el.id === "retryTiles") {

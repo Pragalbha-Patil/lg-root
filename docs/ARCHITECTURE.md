@@ -54,7 +54,8 @@ backoff. Reconnections discard stale stream data and timers. Icons are size-chec
 before reading and identical bytes are not rewritten. Luna requests have deadlines
 and completion guards; the frontend retains only pending requests. Unchanged live
 tile results preserve existing DOM nodes, icon fallbacks, and focus rather than
-rebuilding the rows. The normal startup/foreground request uses the preferences
+rebuilding the rows. Failed icon slots retry once per discovery refresh; successful
+images and focus are preserved. No icon-only polling loop is added. The normal startup/foreground request uses the preferences
 bundled with `getTiles`, applying them before rendering; `getPrefs` is a
 compatibility fallback for responses without preferences. Responses requested
 before or during a local preference save cannot replace the local edits.
