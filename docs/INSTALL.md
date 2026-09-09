@@ -29,7 +29,41 @@ Proceed when it returns `returnValue: true`. A missing-service or denied-method
 response is a registration/permissions problem, not a reason to broaden all app
 permissions.
 
+## Before upgrading
+
+Both upload paths overwrite shipped files, including **service-local config.json**.
+They preserve unshipped `prefs.json`, `usage.json` and the icon cache, but this is
+not a backup of your custom greeting, system allowlist or app priorities.
+
+1. Keep a working SSH session and your current known-good release archive. Record
+   how your installation starts the watcher and registers the relay.
+2. Download a backup of the service-local `config.json` into a private directory
+   on your computer before upload. Also back up `prefs.json` and `usage.json` if
+   present and important. Do not publish these files or put them in release payloads.
+   For example, from an already created private backup directory:
+
+   ```sh
+   scp root@mytv:/media/developer/apps/usr/palm/services/org.minimal.home.service/config.json config-before-upgrade.json
+   ```
+
+3. After upload, compare the saved config with the new service config. Reapply
+   intended customizations to the new schema, preserving new fields and build
+   metadata; do not blindly overwrite it with the old file. Validate JSON, replace
+   it atomically, and refresh the launcher. The source README describes this flow.
+4. Restart only your launcher webview, relay and watcher through the existing
+   device workflow. Verify the scenarios in **Updating and verifying**.
+
+If a copy is interrupted, do not launch the partially updated installation.
+Re-upload a complete verified release. To roll back, stop the specific watcher
+and disable its boot hook, confirm stock Home works, then upload the previous
+known-good release and merge its compatible config from your backup. Restart the
+specific processes and verify before re-enabling the hook. No broad platform
+restart or removal of unrelated registrations is required. Recovery commands
+depend on the registration/boot mechanism you originally installed.
+
 ## Upload from a source checkout
+
+Complete **Before upgrading** above before uploading to an existing installation.
 
 Build on your computer with Python 3.10+. Use a POSIX shell with SSH/SCP installed;
 on Windows use Git Bash or WSL. Configure an SSH host alias such as `mytv`.
@@ -58,6 +92,8 @@ It preserves TV preferences, usage history, and icons by uploading only shipped
 files. It does not terminate existing processes or replace boot hooks.
 
 ## Upload a release archive
+
+Complete **Before upgrading** above first.
 
 On your computer, extract `minimal-home-vVERSION.tar.gz` into an empty directory.
 The archive contains only runtime files, this guide, and the license. If a
