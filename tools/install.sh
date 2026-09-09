@@ -16,7 +16,8 @@ for arg in "$@"; do
         --help|-h)
             echo "usage: sh tools/install.sh [--check] [--no-build]"
             echo "env: TV_HOST (SSH alias or hostname), TV_USER (default root), PYTHON (default python)"
-            echo "Uploads files and requests launch; does not register Luna services or install boot hooks."
+            echo "Preserves installed config, uploads files, and requests launch."
+            echo "Does not register Luna services or install boot hooks."
             exit 0
             ;;
         *) fail "unknown option: $arg" ;;
@@ -52,16 +53,42 @@ command -v scp >/dev/null 2>&1 || fail "scp is required"
 command -v "$PYTHON" >/dev/null 2>&1 || fail "Python is required; set PYTHON to its executable"
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 cd "$SCRIPT_DIR/.."
-if [ "$DO_BUILD" -eq 1 ]; then
+if [ "$DO_BUILD" -eq 1 ] && [ -f build_launcher.py ]; then
     "$PYTHON" build_launcher.py
 fi
 
 STAGE_DIR=$(mktemp -d)
 trap 'rm -rf -- "$STAGE_DIR"' EXIT
 trap 'exit 1' HUP INT TERM
-# package.py verifies generated output even with --no-build. Stage only shipped
-# files so local prefs, usage, icons, or credentials never overwrite TV state.
-"$PYTHON" tools/package.py --stage "$STAGE_DIR"
+if [ -f build_launcher.py ]; then
+    # package.py verifies generated output even with --no-build. Stage only
+    # shipped files so local state or credentials never overwrite TV state.
+    "$PYTHON" tools/package.py --stage "$STAGE_DIR"
+else
+    # Release archives already contain only the deployment allowlist.
+    [ -f launcher-app/appinfo.json ] && [ -f launcher-service/config.json ] ||
+        fail "run the bundled installer from the extracted release directory"
+    cp -R launcher-app launcher-service "$STAGE_DIR/"
+fi
+
+# Fetch the installed config before changing any TV files. An empty result means
+# this is a first install. A malformed config aborts before upload; otherwise its
+# custom values are merged over the new schema while the release version wins.
+FETCHED_CONFIG=$STAGE_DIR/config.fetched
+INSTALLED_CONFIG=$STAGE_DIR/config.installed.json
+MERGED_CONFIG=$STAGE_DIR/config.merged.json
+# Paths are fixed local constants; expand them before sending the command.
+# shellcheck disable=SC2029
+ssh "$REMOTE" "if test -f '$SVC_DIR/config.json'; then printf '%s\\n' MINIMAL_HOME_CONFIG_PRESENT; cat '$SVC_DIR/config.json'; fi" > "$FETCHED_CONFIG"
+if [ -s "$FETCHED_CONFIG" ]; then
+    [ "$(sed -n '1p' "$FETCHED_CONFIG")" = MINIMAL_HOME_CONFIG_PRESENT ] ||
+        fail "unexpected response while reading installed config"
+    sed '1d' "$FETCHED_CONFIG" > "$INSTALLED_CONFIG"
+    "$PYTHON" tools/merge_config.py \
+        "$STAGE_DIR/launcher-service/config.json" "$INSTALLED_CONFIG" "$MERGED_CONFIG"
+    cp "$MERGED_CONFIG" "$STAGE_DIR/launcher-service/config.json"
+    echo "Preserved installed Minimal Home configuration."
+fi
 # Paths are fixed local constants; expand them before sending the command.
 # shellcheck disable=SC2029
 ssh "$REMOTE" "mkdir -p '$APP_DIR' '$SVC_DIR'"

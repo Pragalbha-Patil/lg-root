@@ -77,6 +77,11 @@ previous file. Preference updates are serialized in the frontend so rapid edits
 cannot arrive at the service out of order.
 The bypass stores an expiry timestamp for ten minutes.
 
+The installer downloads and validates the service-local `config.json` before an
+update, merges its custom values over the new schema while retaining the new build
+version, and uploads only the merged result. Unshipped preferences, usage, bypass,
+and icon files remain in place.
+
 The watcher writes icons inside the app's `icons/` directory and a temporary
 statistics sample at `/tmp/minhome-stats.json`. Logs are
 `/tmp/minhome-svc.log` and `/tmp/minhome-watch.log`. Files under `/tmp` are

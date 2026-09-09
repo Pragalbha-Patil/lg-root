@@ -28,7 +28,12 @@ RUNTIME_FILES = (
     "launcher-service/services.json",
     "launcher-service/watcher.js",
 )
-RELEASE_FILES = RUNTIME_FILES + ("LICENSE", "docs/INSTALL.md")
+RELEASE_FILES = RUNTIME_FILES + (
+    "LICENSE",
+    "docs/INSTALL.md",
+    "tools/install.sh",
+    "tools/merge_config.py",
+)
 
 
 def stage(destination, root=ROOT):
@@ -48,7 +53,7 @@ def package(destination, root=ROOT):
                     data = (root / name).read_bytes()
                     entry = tarfile.TarInfo(name)
                     entry.size = len(data)
-                    entry.mode = 0o644
+                    entry.mode = 0o755 if name == "tools/install.sh" else 0o644
                     archive.addfile(entry, io.BytesIO(data))
     digest = hashlib.sha256(destination.read_bytes()).hexdigest()
     destination.with_name(destination.name + ".sha256").write_text(
