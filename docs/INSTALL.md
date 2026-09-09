@@ -44,6 +44,12 @@ Normal upload creates missing target directories, builds, checks generated-file
 freshness, stages the runtime file allowlist, preserves the installed configuration,
 uploads it, and requests launch.
 SSH/SCP failures and unsuccessful Luna launch replies produce a nonzero exit.
+The service directory receives sticky shared-write permissions so the jailed relay
+can atomically maintain preferences and its temporary Home-bypass marker without
+being able to remove files owned by other accounts.
+On rooted builds whose SSH sessions omit the Luna preload environment, the helper
+reuses the running Minimal Home watcher's environment for the launch request. It
+falls back to the normal SSH-session call when no watcher environment is available.
 
 | Variable/option | Purpose |
 | --- | --- |

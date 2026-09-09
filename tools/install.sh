@@ -95,8 +95,17 @@ fi
 ssh "$REMOTE" "mkdir -p '$APP_DIR' '$SVC_DIR'"
 scp -r "$STAGE_DIR/launcher-app/." "$REMOTE:$APP_DIR/"
 scp -r "$STAGE_DIR/launcher-service/." "$REMOTE:$SVC_DIR/"
+# Recursive SCP can reapply the staged directory mode to an existing target, so
+# restore the jailer's runtime-write access only after both uploads complete.
+# shellcheck disable=SC2029
+ssh "$REMOTE" "chmod 1777 '$SVC_DIR'"
 echo "Requesting launch of Minimal Home"
-RESPONSE=$(ssh "$REMOTE" "luna-send -n 1 luna://com.webos.applicationManager/launch '{\"id\":\"org.minimal.home\"}'")
+# Some rooted webOS builds give boot-hook processes the Luna preload environment
+# but omit it from root SSH sessions. Reuse the running watcher's bounded
+# environment when available, with the ordinary SSH-session call as a fallback.
+# Paths and the payload are fixed local constants expanded before transmission.
+# shellcheck disable=SC2029
+RESPONSE=$(ssh "$REMOTE" "watcher=\$(ps -eo pid,args | awk '\$2 == \"node\" && \$3 == \"$SVC_DIR/watcher.js\" {print \$1; exit}'); if test -n \"\$watcher\" && test -r \"/proc/\$watcher/environ\"; then xargs -0 env < \"/proc/\$watcher/environ\" luna-send -n 1 luna://com.webos.applicationManager/launch '{\"id\":\"org.minimal.home\"}'; else luna-send -n 1 luna://com.webos.applicationManager/launch '{\"id\":\"org.minimal.home\"}'; fi")
 printf '%s\n' "$RESPONSE"
 printf '%s\n' "$RESPONSE" | "$PYTHON" -c 'import json,sys; sys.exit(0 if json.load(sys.stdin).get("returnValue") is True else 1)'
 echo "Upload and launch request succeeded. Running webviews/services may still need restarting; see docs/INSTALL.md."
