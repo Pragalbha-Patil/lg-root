@@ -421,6 +421,7 @@
     d.className = t.pinned ? "tile pinned" : "tile";
     d.tabIndex = 0;
     d.setAttribute("role", "button");
+    d.setAttribute("aria-label", t.title || t.id);
     d.setAttribute("data-id", t.id);
     try {
       d.setAttribute("data-params", t.params ? JSON.stringify(t.params) : "");

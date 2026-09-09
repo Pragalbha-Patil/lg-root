@@ -46,7 +46,7 @@ body.density-large {
   --tile-label: 26px;
   --grid-min: 368px;
 }
-body.no-labels .label {
+body.no-labels .tile .label {
   display: none;
 }
 header {

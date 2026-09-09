@@ -76,7 +76,9 @@ row; Back closes the panel.
 
 Preferences include accent color, tile size, labels, clock options, date format,
 sort mode, and system statistics. Use the per-tile menu to pin/unpin or hide an app;
-restore hidden apps from Settings. Reset all restores defaults.
+restore hidden apps from Settings. App labels affects tile captions only, not
+CPU/RAM/temperature captions; tiles retain accessible names when captions are hidden.
+Reset all restores defaults.
 
 Preferences live in `prefs.json` next to the service on the TV, not in the build
 config. The installer preserves these files. Recently used sorts by launch recency,
