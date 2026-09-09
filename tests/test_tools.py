@@ -262,9 +262,14 @@ class InstallerTest(unittest.TestCase):
         result = self.install("--no-build")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         command = next(line for line in self.log.read_text().splitlines() if "luna-send" in line)
-        payload = command.split("'", 2)[1]
+        payload = command.rsplit("'", 2)[1]
         self.assertEqual(json.loads(payload), {"id": "org.minimal.home"})
-        self.assertEqual(self.log.read_text().splitlines().count("scp"), 2)
+        self.assertIn("xargs -0 env", command)
+        self.assertIn("/proc/$watcher/environ", command)
+        calls = self.log.read_text()
+        self.assertIn("chmod 1777", calls)
+        self.assertLess(calls.rfind("\nscp\n"), calls.find("chmod 1777"))
+        self.assertEqual(calls.splitlines().count("scp"), 2)
         self.assertIn("Preserved installed Minimal Home configuration.", result.stdout)
 
     def test_bundled_release_installer_preserves_config(self):

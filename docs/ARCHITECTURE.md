@@ -117,6 +117,12 @@ These constraints come from project device observations, including webOS
   preventing bookmark `params.id` from replacing the target app ID.
 - The foreground subscription uses
   `com.webos.applicationManager/getForegroundAppInfo`, not `getForegroundApp`.
+- Some root SSH sessions lack the Luna preload environment even while boot-hook
+  processes can use Luna normally. The installer reuses a running Minimal Home
+  watcher's environment for its final launch request when available.
+- The jailed relay must create runtime state beside its service files. The
+  installer gives that directory sticky shared-write permissions, preserving
+  per-file ownership while allowing atomic preference and bypass writes.
 - Changed files do not necessarily replace already-running webview, relay, or
   watcher processes. See [installation](INSTALL.md) for verification.
 
