@@ -12,6 +12,8 @@ Complete the [contributor setup](../CONTRIBUTING.md#local-setup), including
 2. Run `python build_launcher.py` and commit the source and generated outputs
    together. Do not use `--version` as a substitute for the source version.
 3. Run `python tools/check.py`.
+   Also complete the [full CI checklist](TESTING.md#full-ci-checklist), including
+   Linux ShellCheck; the shared command is not the entire workflow.
 4. Run `python tools/package.py --tag vVERSION`, replacing VERSION with the
    configured version. Inspect the archive and its SHA-256 sidecar in `dist/`.
 5. Record the TV models/firmware and device scenarios actually tested. Call out
