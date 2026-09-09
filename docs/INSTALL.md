@@ -59,22 +59,33 @@ files. It does not terminate existing processes or replace boot hooks.
 
 ## Upload a release archive
 
-On your computer, extract `minimal-home-vVERSION.tar.gz` into an empty directory.
-The archive contains only runtime files, this guide, and the license. If a
-checksum file was downloaded alongside the archive, verify it before extraction:
+The archive contains only runtime files, this guide, and the license. On your
+computer, use a POSIX shell, SSH/SCP, `sha256sum`, `tar`, and Python 3.10+ for
+response validation. On Windows use Git Bash or WSL. Set `PYTHON=python3` if
+`python` is not your executable. Download the archive and its matching checksum
+into an otherwise empty directory. Back up custom service config before upload;
+see [configuration](CONFIGURATION.md#on-tv-configuration) in a source checkout.
+
+Replace VERSION in both filenames and `mytv` with your SSH alias. Run this entire
+block from the download directory. It stops before extraction/upload/launch if
+a preceding step fails. **Do not bypass a checksum mismatch or continue after a
+failed copy.** The checksum verifies bytes, not publisher identity; obtain both
+files from the intended repository release.
 
 ```sh
+(
+set -eu
+PYTHON=${PYTHON:-python}
+command -v "$PYTHON" >/dev/null
 sha256sum -c minimal-home-vVERSION.tar.gz.sha256
 tar -xzf minimal-home-vVERSION.tar.gz
-```
-
-In the extracted directory, replace `mytv` with your SSH alias and upload:
-
-```sh
 ssh root@mytv "mkdir -p /media/developer/apps/usr/palm/applications/org.minimal.home /media/developer/apps/usr/palm/services/org.minimal.home.service"
 scp -r launcher-app/. root@mytv:/media/developer/apps/usr/palm/applications/org.minimal.home/
 scp -r launcher-service/. root@mytv:/media/developer/apps/usr/palm/services/org.minimal.home.service/
-ssh root@mytv "luna-send -n 1 luna://com.webos.applicationManager/launch '{\"id\":\"org.minimal.home\"}'"
+RESPONSE=$(ssh root@mytv "luna-send -n 1 luna://com.webos.applicationManager/launch '{\"id\":\"org.minimal.home\"}'")
+printf '%s\n' "$RESPONSE"
+printf '%s\n' "$RESPONSE" | "$PYTHON" -c 'import json,sys; sys.exit(0 if json.load(sys.stdin).get("returnValue") is True else 1)'
+)
 ```
 
 Use recursive copies only from the extracted release, whose contents exclude
