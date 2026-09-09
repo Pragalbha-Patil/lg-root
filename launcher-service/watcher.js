@@ -61,7 +61,7 @@ function listLaunchPoints() {
             ],
             { timeout: 20000 },
             (err, stdout) => {
-                if (err) return resolve([]);
+                if (err) return resolve(null);
                 try {
                     const p = JSON.parse(stdout);
                     resolve(
@@ -69,10 +69,10 @@ function listLaunchPoints() {
                             p.returnValue === true &&
                             Array.isArray(p.launchPoints)
                             ? p.launchPoints
-                            : []
+                            : null
                     );
                 } catch (e) {
-                    resolve([]);
+                    resolve(null);
                 }
             }
         );
@@ -94,32 +94,52 @@ function copyIcon(source, destination) {
 }
 
 function provisionIcons(points) {
+    if (!Array.isArray(points)) return;
     let copied = 0,
         total = 0;
+    const keep = new Set([SETTINGS_ID + '.png']);
     try {
         fs.mkdirSync(ICON_DIR, { recursive: true });
     } catch (error) {
         log({ iconDirectory: String(error) });
     }
-    (points || []).forEach((point) => {
+    points.forEach((point) => {
         if (!point || !M.validId(point.id)) return;
         const destination = path.join(ICON_DIR, point.id + '.png');
+        keep.add(point.id + '.png');
         total++;
         let good = false;
-        try {
-            good = copyIcon(point.largeIcon || point.icon, destination);
-        } catch (error) {
-            log({ iconCopy: String(error) });
+        const candidates = [point.largeIcon, point.icon];
+        for (const source of new Set(candidates)) {
+            try {
+                if (copyIcon(source, destination)) {
+                    good = true;
+                    break;
+                }
+            } catch (error) {
+                log({ iconCopy: String(error) });
+            }
         }
         if (good) copied++;
-        else {
+        // A temporary source error must not delete last-known-good bytes.
+    });
+    try {
+        fs.readdirSync(ICON_DIR).forEach((name) => {
+            if (
+                !name.endsWith('.png') ||
+                !M.validId(name.slice(0, -4)) ||
+                keep.has(name)
+            )
+                return;
             try {
-                fs.unlinkSync(destination);
+                fs.unlinkSync(path.join(ICON_DIR, name));
             } catch (error) {
                 log({ iconCleanup: String(error) });
             }
-        }
-    });
+        });
+    } catch (error) {
+        log({ iconPrune: String(error) });
+    }
     log({ method: 'icon-provision', total, copied });
 }
 

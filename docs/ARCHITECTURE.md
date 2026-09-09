@@ -51,7 +51,10 @@ enabled. The watcher is not a zero-work idle process. Repeated Home notification
 retain a redirect cooldown, but a confirmed transition to another app clears it
 so the next return to Home redirects immediately. Failed launches retain bounded
 backoff. Reconnections discard stale stream data and timers. Icons are size-checked
-before reading and identical bytes are not rewritten. Luna requests have deadlines
+before reading and identical bytes are not rewritten. Invalid large icons fall
+back to ordinary icons; transient source errors preserve last-known-good bytes.
+Cache pruning runs only after confirmed successful discovery, preserving the
+special Settings icon and unrelated files. Luna requests have deadlines
 and completion guards; the frontend retains only pending requests. Unchanged live
 tile results preserve existing DOM nodes, icon fallbacks, and focus rather than
 rebuilding the rows. Failed icon slots retry once per discovery refresh; successful
