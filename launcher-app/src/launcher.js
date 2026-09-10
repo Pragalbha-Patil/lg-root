@@ -146,7 +146,7 @@
     clockHTML = "";
   var prefsRevision = 0;
   var prefsSaving = false,
-    prefsCompletion = null;
+    prefsCompletions = [];
   var ACCENTS = {
     steel: { name: "Steel", main: "#8fb6ff", soft: "rgba(143,182,255,.35)" },
     emerald: { name: "Emerald", main: "#4ade9d", soft: "rgba(74,222,157,.35)" },
@@ -622,8 +622,15 @@
   }
   function commitPrefs(onDone) {
     prefsRevision++;
-    prefsCompletion = onDone;
+    if (onDone) prefsCompletions.push(onDone);
     if (!prefsSaving) savePrefs();
+  }
+  function runCompletions() {
+    var completions = prefsCompletions;
+    prefsCompletions = [];
+    completions.forEach(function (completion) {
+      completion();
+    });
   }
   function savePrefs() {
     prefsSaving = true;
@@ -639,9 +646,7 @@
           "Could not save settings: " + (error.errorText || "unknown error")
         );
       else PREFS = M.preferences(response.prefs);
-      var completion = prefsCompletion;
-      prefsCompletion = null;
-      if (completion) completion();
+      runCompletions();
     }
     svcCall(
       SVC,
