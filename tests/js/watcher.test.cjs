@@ -148,6 +148,14 @@ test('periodic provisioning requests launch points and copies the returned icons
     assert.ok(w.disk.files.has(C.APP_DIR + '/icons/video.png'));
 });
 
+test('initial icon provisioning is scheduled immediately', async () => {
+    const w = watcher(); w.disk.files.set('/icon', 'icon');
+    const task = w.clock.run(0);
+    w.respond({ returnValue: true, launchPoints: [{ id: 'video', icon: '/icon' }] });
+    await task;
+    assert.ok(w.disk.files.has(C.APP_DIR + '/icons/video.png'));
+});
+
 
 test('a real foreground transition permits immediate return without the old cooldown', async () => {
     for (const appId of [C.SELF_ID, 'video', 'com.webos.app.hdmi1']) {

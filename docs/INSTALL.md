@@ -4,20 +4,19 @@ Minimal Home requires an already rooted LG webOS TV with SSH access. It does not
 include a root exploit. The [webOS Homebrew project](https://www.webosbrew.org)
 provides information about rooting and the Homebrew environment.
 
-## First-install boundary
+## What the installer does
 
-Copying these files alone is **not a complete first-install process**. The web app
-and relay must be registered with Luna, and the relay needs permissions to query
-and launch applications. This repository does not yet automate that firmware-
-dependent setup or install a persistent watcher boot hook.
+`tools/install.sh` performs a complete first install or update. It builds an
+allowlisted `.ipk`, asks webOS's developer install service to install and register
+the app and Node relay, installs an idempotent watcher hook under
+`/var/lib/webosbrew/init.d/`, applies Homebrew service elevation, starts the
+watcher, restarts any already-running Minimal Home relay, and launches a fresh
+Minimal Home webview.
 
-Before using the upload helper, establish app/service registration through your
-root environment. Existing project observations use dev-mode LS2 registration
-under `/var/luna-service2-dev/` and client permissions under
-`/var/luna-service2/`. The app client uses the `public` group; the relay needs
-`public`, `applications`, `applications.launch`, `applications.query`, and
-`applications.internal`. Registration details vary by firmware; do not assume
-`services.json` alone grants these permissions.
+The package manifest requests the application-manager permissions used by the
+relay. IPK installation creates the base Luna registration, then Homebrew's
+`elevate-service` supplies legacy TV permissions that manifests do not install
+consistently. The installer does not write version-specific Luna files by hand.
 
 On the TV, check the relay:
 
@@ -25,9 +24,9 @@ On the TV, check the relay:
 luna-send -n 1 luna://org.minimal.home.service/getTiles '{}'
 ```
 
-Proceed when it returns `returnValue: true`. A missing-service or denied-method
-response is a registration/permissions problem, not a reason to broaden all app
-permissions.
+After installation this should return `returnValue: true`. A missing-service or
+denied-method response is a registration/permissions problem, not a reason to
+broaden all app permissions.
 
 ## Upload from a source checkout
 
@@ -39,40 +38,44 @@ TV_HOST=mytv sh tools/install.sh --check
 TV_HOST=mytv sh tools/install.sh
 ```
 
-The directory check is read-only and does not prove Luna registration works.
-Normal upload creates missing target directories, builds, checks generated-file
-freshness, stages the runtime file allowlist, preserves the installed configuration,
-uploads it, and requests launch.
+The prerequisite check is read-only. It verifies root SSH, the Luna install client,
+Node.js, `setsid`, and Homebrew's service-elevation helper. A normal run builds,
+checks generated-file freshness, stages the runtime allowlist, preserves the
+installed configuration and runtime state, builds and uploads an IPK, installs
+it, replaces only the Minimal Home watcher and relay processes, and requests a
+fresh launch.
 SSH/SCP failures and unsuccessful Luna launch replies produce a nonzero exit.
 The service directory receives sticky shared-write permissions so the jailed relay
 can atomically maintain preferences and its temporary Home-bypass marker without
 being able to remove files owned by other accounts.
-On rooted builds whose SSH sessions omit the Luna preload environment, the helper
-reuses the running Minimal Home watcher's environment for the launch request. It
-falls back to the normal SSH-session call when no watcher environment is available.
+The installer uses the public Luna client for IPK installation. On rooted builds
+whose SSH sessions omit Luna preload variables, it reuses the running Minimal Home
+watcher's environment for final launch.
 
 | Variable/option | Purpose |
 | --- | --- |
 | `TV_HOST` | Required SSH alias, hostname, or IPv4 address; use an alias for IPv6 |
 | `TV_USER` | SSH user, default `root` |
 | `PYTHON` | Python executable, default `python`; set `python3` if needed |
-| `--check` | Check remote app/service directories without modifying them |
+| `--check` | Check remote first-install prerequisites without modifying them |
 | `--no-build` | Skip generation; still require up-to-date generated files |
 
 App and service IDs are fixed in manifests and code. Environment overrides to
 different IDs are rejected. The helper can run from any current directory.
-It preserves TV preferences, usage history, and icons by uploading only shipped
-files. If a service-local `config.json` exists, the helper reads and validates it
+It preserves TV preferences, usage history, and icons by packaging only shipped
+files and backing up runtime state to `/tmp` during the package transaction. If a
+service-local `config.json` exists, the helper reads and validates it
 before uploading anything, then merges its custom values onto the new schema.
 New fields and the release version are retained automatically. A malformed existing
-config stops the update before TV files change. The helper does not terminate
-existing processes or replace boot hooks.
+config stops the update before TV files change. The helper replaces its own boot
+hook and restarts only its own watcher and relay so updated code and permissions
+take effect.
 
 ## Upload a release archive
 
-On your computer, extract `minimal-home-vVERSION.tar.gz` into an empty directory.
-The archive contains only runtime files, the installer, this guide, and the
-license. If a checksum file was downloaded alongside the archive, verify it
+Releases contain both an installable IPK and a source archive with the complete
+installer. On your computer, extract `minimal-home-vVERSION.tar.gz` into an empty
+directory. If a checksum file was downloaded alongside either artifact, verify it
 before extraction:
 
 ```sh
@@ -88,36 +91,40 @@ checkout:
 TV_HOST=mytv sh tools/install.sh
 ```
 
-The archive contains only allowlisted files, not personal runtime state. It is not
-an IPK and does not register services.
+The archive contains only allowlisted files, not personal runtime state. Its
+installer builds the same IPK locally after merging any installed configuration.
 
-## Start the watcher
-
-The watcher runs separately from the on-demand relay. On the TV, after confirming
-that another watcher instance is not already running:
+You may instead install the release IPK directly with webOS Dev Manager or the
+official CLI:
 
 ```sh
-setsid node /media/developer/apps/usr/palm/services/org.minimal.home.service/watcher.js \
-  </dev/null >/dev/null 2>&1 &
+ares-install --device mytv org.minimal.home_VERSION_all.ipk
 ```
 
-For persistence, integrate that command into your root environment's boot hook
-after Luna is available. webOS Homebrew setups commonly use executable scripts
-under `/var/lib/webosbrew/init.d/`. Keep hooks LF-only and validate them with
-`sh -n` before enabling them. Hook installation is currently manual.
+Direct IPK installation registers the app and relay, but does not install or start
+the root watcher. Run the bundled installer for Home-button redirection, icon
+provisioning, and system statistics.
+
+## Watcher startup
+
+The full installer adds `/var/lib/webosbrew/init.d/50-minimal-home` and starts it
+immediately. The hook is idempotent, so it will not create duplicate watcher
+processes. To start it manually:
+
+```sh
+/var/lib/webosbrew/init.d/50-minimal-home
+```
 
 ## Updating and verifying
 
-Uploading files may leave the previous code in running processes. Close and
-relaunch the webview; restart the specific relay and watcher processes through
-your existing device workflow. The on-demand relay loads new code on its next
-start. Broad platform restarts can interrupt other apps and are not performed
-by the installer.
+The installer restarts its watcher and any already-running relay. The
+install/launch sequence refreshes the app. Broad platform restarts
+can interrupt other apps and are not performed.
 
 Verify app launch, return from another app, D-pad/OK/Back, preferences after
 relaunch, input switching, and the ten-minute LG Home bypass. Confirm the
-watcher is running only once. Icon provisioning first runs shortly after watcher
-startup and repeats every five minutes.
+watcher is running only once. Icon provisioning starts immediately and repeats
+every five minutes. The installer briefly waits for that first pass before launch.
 
 ## Troubleshooting
 

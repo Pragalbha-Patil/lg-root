@@ -34,5 +34,7 @@ jobs:
           files: |
             dist/minimal-home-*.tar.gz
             dist/minimal-home-*.tar.gz.sha256
+            dist/org.minimal.home_*.ipk
+            dist/org.minimal.home_*.ipk.sha256
           fail_on_unmatched_files: true
           body_path: docs/releases/${{ github.ref_name }}.md

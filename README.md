@@ -25,21 +25,30 @@ inputs, and a clock on a dark background, with navigation designed for a TV remo
 22.22.2+ (22.x) or 24.15+ (24.x), and the host-only npm development tools.
 No Python packages or npm runtime dependencies are deployed to the TV.
 
-**On the TV:** root access, SSH, Node.js, the platform-provided `webos-service`
-module, and the required Luna service registration and permissions. This project
-does not root your TV. Device notes cover webOS 10.3.1; there is no verified
-compatibility matrix across TV models or firmware.
+**On the TV:** root access, SSH, Homebrew Channel boot hooks, Node.js, and the
+platform-provided `webos-service` module. The installer creates the app/service
+registration and requested Luna permissions. This project does not root your TV.
+Device notes cover webOS 10.3.1; there is no verified compatibility matrix across
+TV models or firmware.
 
-### Build or update an existing installation
+### Install on a rooted TV
 
-This path needs Python and Git, not Node/npm on your computer. Upload also needs
-a POSIX shell and SSH/SCP; see the installation guide for registration and backups.
+This path needs Python, Git, a POSIX shell, and SSH/SCP on your computer. It builds
+a standard webOS `.ipk`, installs the app and service through webOS, adds the
+watcher to the Homebrew Channel boot hooks, and launches Minimal Home.
 
 ```sh
 git clone https://github.com/Pragalbha-Patil/webos-minimal-home.git
 cd webos-minimal-home
-python build_launcher.py
+TV_HOST=mytv sh tools/install.sh --check
+TV_HOST=mytv sh tools/install.sh
 ```
+
+`mytv` can be an SSH host alias, hostname, or IPv4 address. The installer requires
+root SSH and an installed Homebrew Channel environment; it uses Homebrew's service
+elevation for legacy Luna permissions and preserves preferences, usage, icons, and
+customized configuration during updates. See the
+[installation and recovery guide](docs/INSTALL.md) before first use.
 
 ### Desktop preview
 
@@ -53,19 +62,16 @@ pinning, saving, stats and recovery require a TV or the isolated test harness.
 Restore the normal
 build with `python build_launcher.py` before committing or packaging.
 
-### Upload
+### Install a release IPK manually
 
-For an already registered installation, use a POSIX shell (Git Bash or WSL on Windows):
+Release downloads include an `.ipk` containing both the app and its Node service.
+It can be installed with webOS Dev Manager or `ares-install`, but those methods do
+not install or start the root watcher. Use `tools/install.sh` from the source or
+release archive for the complete launcher setup.
 
 ```sh
-TV_HOST=mytv sh tools/install.sh --check
-TV_HOST=mytv sh tools/install.sh
+ares-install --device mytv org.minimal.home_VERSION_all.ipk
 ```
-
-The installer uploads app/service files and requests launch. **It does not
-register Luna permissions or install a boot hook.** Read the
-[installation and recovery guide](docs/INSTALL.md) before first use. Downloaded
-release archives include their own installation guide and checksum.
 
 ### Contribute or run checks
 
