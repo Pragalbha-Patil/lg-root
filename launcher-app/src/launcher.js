@@ -1448,7 +1448,8 @@
   tick();
   var tries = 0,
     refreshRetry = null,
-    refreshing = false;
+    refreshing = false,
+    refreshRequested = false;
   function isBackground() {
     // webOS 10.3.1 can report hidden for a focused foreground webview.
     return document.hidden && !document.hasFocus();
@@ -1467,6 +1468,11 @@
   }
   function tilesFailed() {
     refreshing = false;
+    if (refreshRequested) {
+      refreshRequested = false;
+      refresh();
+      return;
+    }
     if (tries < 6) {
       refreshRetry = setTimeout(refresh, 2500);
     } else if (!tilesLoaded) {
@@ -1481,7 +1487,13 @@
     doLaunch(this);
   });
   function refresh() {
-    if (refreshing || isBackground()) return;
+    if (refreshing || isBackground()) {
+      // A refresh requested while a discovery is in flight must not be
+      // dropped: run one trailing refresh afterwards so a stale snapshot can
+      // never be the last word after returning to the foreground.
+      if (refreshing) refreshRequested = true;
+      return;
+    }
     clearTimeout(refreshRetry);
     refreshRetry = null;
     refreshing = true;
@@ -1528,6 +1540,10 @@
           maybePromptBrand();
         } else {
           tilesFailed();
+        }
+        if (refreshRequested) {
+          refreshRequested = false;
+          refresh();
         }
       },
       tilesFailed
