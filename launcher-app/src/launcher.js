@@ -1334,12 +1334,12 @@
   }
   function applyHeader(h) {
     if (!h) return;
-    if (h.text) {
+    if (typeof h.text === "string") {
       document.getElementById("headText").textContent = String(
         h.text
       ).toUpperCase();
     }
-    if (h.brand) {
+    if (typeof h.brand === "string") {
       document.getElementById("headBrand").textContent = String(h.brand);
       document.title = String(h.brand);
     }
