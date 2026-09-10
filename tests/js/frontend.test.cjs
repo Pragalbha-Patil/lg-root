@@ -126,7 +126,8 @@ test('settings cycle choices, toggles and accents; save errors are visible; acti
     app.click('[data-key="labels"]');
     const call = app.calls.find(c => c.method === 'setPrefs' && !c.answered); call.answered = true; call.onFailure({ errorText: 'disk full' });
     assert.match(app.document.querySelector('#err').textContent, /disk full/);
-    app.click('[data-key="reset"]'); save(app);
+    app.click('[data-key="reset"]');
+    app.click('[data-key="reset-confirm"]'); save(app);
     assert.equal(app.document.body.classList.contains('no-labels'), false);
     app.click('[data-key="close"]'); assert.equal(app.document.querySelector('#settingsPanel').classList.contains('show'), false);
 });
@@ -248,6 +249,58 @@ test('clock format row shows friendly names with live previews', t => {
         if (!app.calls.some(c => c.method === 'setPrefs' && !c.answered)) break;
         save(app);
     }
+});
+
+test('reset asks first; cancel and back keep customization', t => {
+    for (const dismiss of ['click', 'back']) {
+        const app = appFor(t);
+        ready(app, { prefs: { pinned: ['video'], labels: false } });
+        app.click('#settingsBtn');
+        app.click('[data-key="reset"]');
+        assert.ok(app.document.querySelector('#confirmPanel.show'));
+        assert.equal(app.document.querySelector('#settingsPanel.show'), null);
+        assert.equal(app.document.activeElement.getAttribute('data-key'), 'reset-cancel');
+        assert.equal(app.calls.filter(c => c.method === 'setPrefs').length, 0);
+        if (dismiss === 'click') app.click('[data-key="reset-cancel"]');
+        else app.key(461);
+        assert.ok(app.document.querySelector('#settingsPanel.show'));
+        assert.equal(app.document.querySelector('#confirmPanel.show'), null);
+        assert.equal(app.document.activeElement.getAttribute('data-key'), 'reset');
+        assert.equal(app.calls.filter(c => c.method === 'setPrefs').length, 0);
+        assert.ok(app.document.body.classList.contains('no-labels'));
+    }
+});
+
+test('a held OK cannot confirm the reset dialog', t => {
+    const app = appFor(t); ready(app);
+    app.click('#settingsBtn');
+    row(app, 'reset').focus();
+    app.key(13);
+    assert.ok(app.document.querySelector('#confirmPanel.show'));
+    app.key(13);
+    assert.ok(app.document.querySelector('#confirmPanel.show'));
+    assert.equal(app.calls.filter(c => c.method === 'setPrefs').length, 0);
+    app.key(13, 'keyup');
+    app.key(40); app.key(40, 'keyup');
+    assert.equal(app.document.activeElement.getAttribute('data-key'), 'reset-confirm');
+    app.key(13); app.key(13, 'keyup');
+    const call = app.calls.find(c => c.method === 'setPrefs' && !c.answered);
+    assert.deepEqual([...call.parameters.pinned], []);
+    assert.equal(call.parameters.sort, 'mru');
+    save(app);
+    assert.ok(app.document.querySelector('#settingsPanel.show'));
+    assert.equal(app.document.activeElement.getAttribute('data-key'), 'reset');
+});
+
+test('reset failure stays visible with settings open', t => {
+    const app = appFor(t); ready(app);
+    app.click('#settingsBtn');
+    app.click('[data-key="reset"]');
+    app.click('[data-key="reset-confirm"]');
+    const call = app.calls.find(c => c.method === 'setPrefs' && !c.answered);
+    call.answered = true; call.onFailure({ errorText: 'disk full' });
+    assert.match(app.document.querySelector('#err').textContent, /disk full/);
+    assert.ok(app.document.querySelector('#settingsPanel.show'));
 });
 
 test('grouped settings keep remote navigation on controls across section headings', t => {

@@ -358,6 +358,20 @@ h1 b {
 .brand-preview b {
   color: #eef3f9;
 }
+.confirm-text {
+  margin: 0 0 22px;
+  color: #b8c2d0;
+  font-size: 20px;
+  line-height: 1.5;
+}
+.confirm-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+}
+.confirm-actions .srow {
+  flex: 1;
+}
 .brand-preview {
   margin-bottom: 22px;
   padding: 18px 20px;

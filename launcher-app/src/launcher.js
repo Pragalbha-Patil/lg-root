@@ -808,6 +808,7 @@
     document.getElementById("dim").classList.remove("show");
     document.getElementById("settingsPanel").classList.remove("show");
     document.getElementById("brandPanel").classList.remove("show");
+    document.getElementById("confirmPanel").classList.remove("show");
     document.getElementById("optionsPanel").classList.remove("show");
     document.getElementById("searchBox").classList.remove("show");
     overlay.mode = null;
@@ -889,6 +890,20 @@
       focusRow("brand");
     }
     if (changed) commitPrefs();
+  }
+  function openConfirmReset() {
+    document.getElementById("settingsPanel").classList.remove("show");
+    overlay.mode = "confirm";
+    showOverlay("confirmPanel");
+    focusFirst('[data-key="reset-cancel"]');
+  }
+  function closeConfirmReset(confirmed) {
+    document.getElementById("confirmPanel").classList.remove("show");
+    overlay.mode = "settings";
+    renderSettings();
+    document.getElementById("settingsPanel").classList.add("show");
+    if (confirmed) resetAll();
+    else focusRow("reset");
   }
   function maybePromptBrand() {
     if (
@@ -1056,7 +1071,7 @@
       return;
     }
     if (key === "reset") {
-      resetAll();
+      openConfirmReset();
       return;
     }
     if (key && findRow(key)) changeSetting(key, 1);
@@ -1094,12 +1109,18 @@
     var id = el.getAttribute("data-id");
     if (id) launchSearchRow(id);
   }
+  function activateConfirmRow(el) {
+    var key = el.getAttribute("data-key");
+    if (key === "reset-confirm") closeConfirmReset(true);
+    else if (key === "reset-cancel") closeConfirmReset(false);
+  }
   var ROW_ACTIVATORS = {
     brand: activateBrandRow,
     settings: activateSettingsRow,
     manage: activateManageRow,
     options: activateOptionsRow,
-    search: activateSearchRow
+    search: activateSearchRow,
+    confirm: activateConfirmRow
   };
   function activateRow(el) {
     if (!el) return;
@@ -1123,6 +1144,10 @@
       return true;
     }
     if (overlay.mode === "brand") return brandBackKey();
+    if (overlay.mode === "confirm") {
+      closeConfirmReset(false);
+      return true;
+    }
     hideOverlay();
     return true;
   }
@@ -1154,6 +1179,10 @@
   function overlayDirKey(dir) {
     if (overlay.mode === "brand") return brandDirKey(dir);
     if (overlay.mode === "settings") return settingsDirKey(dir);
+    if (overlay.mode === "confirm") {
+      moveFocusIn("#confirmPanel .srow", dir);
+      return true;
+    }
     var selectors = {
       options: "#optionsRows .optrow",
       manage: "#optionsRows .optrow, #optionsRows .srow",
