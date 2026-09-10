@@ -126,8 +126,7 @@ test('settings cycle choices, toggles and accents; save errors are visible; acti
     app.click('[data-key="labels"]');
     const call = app.calls.find(c => c.method === 'setPrefs' && !c.answered); call.answered = true; call.onFailure({ errorText: 'disk full' });
     assert.match(app.document.querySelector('#err').textContent, /disk full/);
-    app.click('[data-key="reset"]');
-    app.click('[data-key="reset-confirm"]'); save(app);
+    app.click('[data-key="reset"]'); app.click('[data-key="reset-confirm"]');
     assert.equal(app.document.body.classList.contains('no-labels'), false);
     app.click('[data-key="close"]'); assert.equal(app.document.querySelector('#settingsPanel').classList.contains('show'), false);
 });
@@ -183,7 +182,7 @@ test('keeping the default brand records setup so updates do not ask again', t =>
     assert.equal(app.document.activeElement.getAttribute('data-key'), 'brand-cancel');
     app.key(13); app.key(13, 'keyup');
     const call = app.calls.find(c => c.method === 'setPrefs' && !c.answered);
-    assert.equal(call.parameters.brand, '');
+    assert.deepEqual(Object.keys(call.parameters), ['brandConfigured']);
     assert.equal(call.parameters.brandConfigured, true);
     save(app);
     const updated = appFor(t);
@@ -274,19 +273,19 @@ test('reset asks first; cancel and back keep customization', t => {
 test('a held OK cannot confirm the reset dialog', t => {
     const app = appFor(t); ready(app);
     app.click('#settingsBtn');
+    app.click('[data-key="labels"]'); save(app);
     row(app, 'reset').focus();
     app.key(13);
     assert.ok(app.document.querySelector('#confirmPanel.show'));
     app.key(13);
     assert.ok(app.document.querySelector('#confirmPanel.show'));
-    assert.equal(app.calls.filter(c => c.method === 'setPrefs').length, 0);
+    assert.equal(app.calls.filter(c => c.method === 'setPrefs' && !c.answered).length, 0);
     app.key(13, 'keyup');
     app.key(40); app.key(40, 'keyup');
     assert.equal(app.document.activeElement.getAttribute('data-key'), 'reset-confirm');
     app.key(13); app.key(13, 'keyup');
     const call = app.calls.find(c => c.method === 'setPrefs' && !c.answered);
-    assert.deepEqual([...call.parameters.pinned], []);
-    assert.equal(call.parameters.sort, 'mru');
+    assert.equal(call.parameters.labels, true);
     save(app);
     assert.ok(app.document.querySelector('#settingsPanel.show'));
     assert.equal(app.document.activeElement.getAttribute('data-key'), 'reset');
@@ -295,6 +294,7 @@ test('a held OK cannot confirm the reset dialog', t => {
 test('reset failure stays visible with settings open', t => {
     const app = appFor(t); ready(app);
     app.click('#settingsBtn');
+    app.click('[data-key="labels"]'); save(app);
     app.click('[data-key="reset"]');
     app.click('[data-key="reset-confirm"]');
     const call = app.calls.find(c => c.method === 'setPrefs' && !c.answered);
@@ -328,7 +328,9 @@ test('late preference replies cannot overwrite a newer local edit', t => {
     app.prefs({ labels: true }); assert.equal(app.document.body.classList.contains('no-labels'), true);
     app.click('[data-key="labels"]');
     assert.equal(app.calls.filter(c => c.method === 'setPrefs').length, 1, 'writes must be serialized');
-    save(app); save(app); assert.equal(app.document.body.classList.contains('no-labels'), false);
+    // The two toggles cancel out, so the follow-up save finds an empty diff
+    // and completes without a second request.
+    save(app); assert.equal(app.document.body.classList.contains('no-labels'), false);
 });
 
 test('options Launch and Close rows work and unrelated overlay keys are ignored', t => {
@@ -639,6 +641,29 @@ test('rapid sort and accent edits keep the sort refresh after both saves', t => 
     assert.equal(app.calls.filter(c => c.method === 'getTiles').length, before + 1);
     app.tiles({ tiles: [video, alpha], inputs: [port] });
     assert.deepEqual(ids(app, 'grid'), ['alpha', 'video']);
+});
+
+test('editing before discovery completes sends only the edited preference', t => {
+    const app = appFor(t);
+    app.click('#settingsBtn');
+    app.click('[data-key="labels"]');
+    const call = app.calls.find(c => c.method === 'setPrefs' && !c.answered);
+    assert.deepEqual(Object.keys(call.parameters), ['labels']);
+    assert.equal(call.parameters.labels, false);
+    save(app);
+    app.tiles({ tiles: [video], inputs: [port],
+        prefs: { pinned: ['video'], hidden: [], accent: 'emerald', sort: 'alpha', labels: false } });
+    assert.deepEqual(ids(app, 'grid'), ['video']);
+    assert.ok(app.document.body.classList.contains('no-labels'));
+});
+
+test('reverting an edit before the save completes sends no second request', t => {
+    const app = appFor(t); ready(app);
+    app.click('#settingsBtn');
+    app.click('[data-key="labels"]');
+    app.click('[data-key="labels"]');
+    save(app);
+    assert.equal(app.calls.filter(c => c.method === 'setPrefs').length, 1);
 });
 
 test('bundled preferences requested during a save cannot overwrite the saved value', t => {
