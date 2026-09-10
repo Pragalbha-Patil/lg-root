@@ -1576,13 +1576,16 @@
     enterPressed = false;
   });
   // System stats polling (every 5s)
+  var statsPending = false;
   function updateSystemStats() {
-    if (!isBackground() && PREFS.showSystemStats)
+    if (!isBackground() && PREFS.showSystemStats && !statsPending) {
+      statsPending = true;
       svcCall(
         SVC,
         SVC_STATS_M,
         {},
         function (d) {
+          statsPending = false;
           if (d && d.returnValue) {
             var cpu = document.getElementById("statCpu");
             var ram = document.getElementById("statRam");
@@ -1598,8 +1601,11 @@
                 typeof d.temp === "number" ? d.temp + "°C" : "--°C";
           }
         },
-        function () {}
+        function () {
+          statsPending = false;
+        }
       );
+    }
     setTimeout(updateSystemStats, 5000);
   }
   setTimeout(updateSystemStats, 1000);
