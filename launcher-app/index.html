@@ -365,6 +365,20 @@ h1 b {
 .brand-preview b {
   color: #eef3f9;
 }
+.confirm-text {
+  margin: 0 0 22px;
+  color: #b8c2d0;
+  font-size: 20px;
+  line-height: 1.5;
+}
+.confirm-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+}
+.confirm-actions .srow {
+  flex: 1;
+}
 .brand-preview {
   margin-bottom: 22px;
   padding: 18px 20px;
@@ -604,6 +618,15 @@ h1 b {
     <div class="srow" tabindex="0" data-key="brand-cancel"><span class="sl" id="brandCancelLabel">Keep Minimal Home</span></div>
   </div>
   <div class="settings-hint">&#8593; &#8595; Navigate &nbsp; &#183; &nbsp; OK Select</div>
+</div>
+<div id="confirmPanel" class="panel" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+  <div class="panel-head" id="confirmTitle">Reset preferences?</div>
+  <p class="confirm-text">This clears appearance, sorting, clock settings, pinned apps and hidden apps. Usage history is kept.</p>
+  <div class="confirm-actions">
+    <div class="srow" tabindex="0" data-key="reset-confirm"><span class="sl">Reset everything</span><span class="val">OK</span></div>
+    <div class="srow" tabindex="0" data-key="reset-cancel"><span class="sl">Cancel</span></div>
+  </div>
+  <div class="settings-hint">&#8593; &#8595; Navigate &nbsp; &#183; &nbsp; OK Select &nbsp; &#183; &nbsp; BACK Cancel</div>
 </div>
 <div id="optionsPanel" class="panel opt">
   <div class="panel-head">Options</div>
@@ -1619,6 +1642,7 @@ window.MH_CONFIG = {"version": "v1.6.0", "system": ["com.webos.app.discovery", "
     document.getElementById("dim").classList.remove("show");
     document.getElementById("settingsPanel").classList.remove("show");
     document.getElementById("brandPanel").classList.remove("show");
+    document.getElementById("confirmPanel").classList.remove("show");
     document.getElementById("optionsPanel").classList.remove("show");
     document.getElementById("searchBox").classList.remove("show");
     overlay.mode = null;
@@ -1700,6 +1724,20 @@ window.MH_CONFIG = {"version": "v1.6.0", "system": ["com.webos.app.discovery", "
       focusRow("brand");
     }
     if (changed) commitPrefs();
+  }
+  function openConfirmReset() {
+    document.getElementById("settingsPanel").classList.remove("show");
+    overlay.mode = "confirm";
+    showOverlay("confirmPanel");
+    focusFirst('[data-key="reset-cancel"]');
+  }
+  function closeConfirmReset(confirmed) {
+    document.getElementById("confirmPanel").classList.remove("show");
+    overlay.mode = "settings";
+    renderSettings();
+    document.getElementById("settingsPanel").classList.add("show");
+    if (confirmed) resetAll();
+    else focusRow("reset");
   }
   function maybePromptBrand() {
     if (
@@ -1867,7 +1905,7 @@ window.MH_CONFIG = {"version": "v1.6.0", "system": ["com.webos.app.discovery", "
       return;
     }
     if (key === "reset") {
-      resetAll();
+      openConfirmReset();
       return;
     }
     if (key && findRow(key)) changeSetting(key, 1);
@@ -1905,12 +1943,18 @@ window.MH_CONFIG = {"version": "v1.6.0", "system": ["com.webos.app.discovery", "
     var id = el.getAttribute("data-id");
     if (id) launchSearchRow(id);
   }
+  function activateConfirmRow(el) {
+    var key = el.getAttribute("data-key");
+    if (key === "reset-confirm") closeConfirmReset(true);
+    else if (key === "reset-cancel") closeConfirmReset(false);
+  }
   var ROW_ACTIVATORS = {
     brand: activateBrandRow,
     settings: activateSettingsRow,
     manage: activateManageRow,
     options: activateOptionsRow,
-    search: activateSearchRow
+    search: activateSearchRow,
+    confirm: activateConfirmRow
   };
   function activateRow(el) {
     if (!el) return;
@@ -1934,6 +1978,10 @@ window.MH_CONFIG = {"version": "v1.6.0", "system": ["com.webos.app.discovery", "
       return true;
     }
     if (overlay.mode === "brand") return brandBackKey();
+    if (overlay.mode === "confirm") {
+      closeConfirmReset(false);
+      return true;
+    }
     hideOverlay();
     return true;
   }
@@ -1965,6 +2013,10 @@ window.MH_CONFIG = {"version": "v1.6.0", "system": ["com.webos.app.discovery", "
   function overlayDirKey(dir) {
     if (overlay.mode === "brand") return brandDirKey(dir);
     if (overlay.mode === "settings") return settingsDirKey(dir);
+    if (overlay.mode === "confirm") {
+      moveFocusIn("#confirmPanel .srow", dir);
+      return true;
+    }
     var selectors = {
       options: "#optionsRows .optrow",
       manage: "#optionsRows .optrow, #optionsRows .srow",
