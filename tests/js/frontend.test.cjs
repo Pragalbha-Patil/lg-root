@@ -374,15 +374,27 @@ test('search ranks prefixes before substrings, caps results, edits only with Bac
     app.key(65, 'keydown', { key: 'a' });
     assert.equal(app.document.querySelectorAll('#searchRows .srow').length, 8);
     assert.equal(app.document.querySelector('#searchRows .srow').dataset.id, 'prefix');
-    app.key(80, 'keydown', { key: 'p' }); app.key(8); assert.match(app.document.querySelector('#searchQ').textContent, /a/);
+    assert.equal(app.document.activeElement, app.document.querySelector('#searchInput'));
+    const input = app.document.querySelector('#searchInput');
+    input.value = 'ap'; input.dispatchEvent(new app.window.Event('input'));
+    assert.equal(input.value, 'ap');
+    app.key(40); app.key(40, 'keyup');
+    assert.equal(app.document.activeElement, app.document.querySelector('#searchRows .srow'));
+    app.key(8);
+    assert.equal(input.value, 'a');
     app.key(461); assert.equal(app.document.querySelector('#searchBox.show'), null);
-    app.key(81, 'keydown', { key: 'q' }); assert.match(app.document.querySelector('#searchRows').textContent, /No matches/);
-    app.key(8); app.key(8); assert.equal(app.document.querySelector('#searchBox.show'), null);
+    app.key(81, 'keydown', { key: 'q' });
+    assert.match(app.document.querySelector('#searchRows').textContent, /No matches/);
+    app.key(40); app.key(40, 'keyup');
+    app.key(8);
+    assert.equal(input.value, '');
+    app.key(8); assert.equal(app.document.querySelector('#searchBox.show'), null);
     assert.equal(app.key(461).defaultPrevented, true);
 });
 
 test('search launches input parameters; double taps and stale launch completions cannot unlock a newer launch', async t => {
-    const app = appFor(t); ready(app); app.key(80, 'keydown', { key: 'p' }); app.key(13);
+    const app = appFor(t); ready(app); app.key(80, 'keydown', { key: 'p' });
+    app.key(40); app.key(40, 'keyup'); app.key(13);
     const first = app.calls.find(c => c.method === 'launchApp');
     assert.equal(first.parameters.id, port.id); assert.equal(first.parameters.params.value, 4);
     assert.equal(first.parameters.params.id, undefined);
@@ -393,6 +405,53 @@ test('search launches input parameters; double taps and stale launch completions
     first.onFailure({ errorText: 'late' });
     const second = app.calls.filter(c => c.method === 'launchApp')[1]; second.onFailure({ errorText: 'offline' });
     await app.clock.run(0); assert.match(app.document.querySelector('#err').textContent, /offline/);
+});
+
+test('search opens from the header button and launches with remote only', t => {
+    const app = appFor(t); ready(app, { tiles: [video], inputs: [port] });
+    app.click('#searchBtn');
+    const input = app.document.querySelector('#searchInput');
+    assert.ok(app.document.querySelector('#searchBox.show'));
+    assert.equal(app.document.activeElement, input);
+    assert.match(app.document.querySelector('#searchRows').textContent, /Type to search/);
+    input.value = 'play'; input.dispatchEvent(new app.window.Event('input'));
+    assert.equal(app.document.querySelector('#searchRows .srow').dataset.id, port.id);
+    assert.equal(app.key(13).defaultPrevented, false, 'OK on the field remains available to the TV keyboard');
+    app.key(13, 'keyup');
+    app.key(40); app.key(40, 'keyup'); app.key(13); app.key(13, 'keyup');
+    const launch = app.calls.find(c => c.method === 'launchApp');
+    assert.equal(launch.parameters.id, port.id);
+    assert.equal(launch.parameters.params.value, 4);
+    assert.equal(app.document.querySelector('#searchBox.show'), null);
+});
+
+test('back from the search field leaves the field instead of closing', t => {
+    const app = appFor(t); ready(app, { tiles: [video], inputs: [port] });
+    const btn = app.document.querySelector('#searchBtn'); btn.focus();
+    app.key(13); app.key(13, 'keyup');
+    const input = app.document.querySelector('#searchInput');
+    input.value = 'vid'; input.dispatchEvent(new app.window.Event('input'));
+    assert.equal(app.key(8).defaultPrevented, false, 'Backspace reaches the field natively');
+    assert.equal(input.value, 'vid');
+    assert.ok(app.document.querySelector('#searchBox.show'));
+    assert.equal(app.key(461).defaultPrevented, true);
+    assert.ok(app.document.querySelector('#searchBox.show'), 'first Back leaves the field');
+    assert.equal(app.document.activeElement, app.document.querySelector('#searchRows .srow'));
+    assert.equal(input.value, 'vid');
+    app.key(461);
+    assert.equal(app.document.querySelector('#searchBox.show'), null);
+    assert.equal(app.document.activeElement, btn);
+});
+
+test('typing from the result rows appends to the query', t => {
+    const app = appFor(t); ready(app, { tiles: [video], inputs: [] });
+    app.click('#searchBtn');
+    const input = app.document.querySelector('#searchInput');
+    input.value = 'vid'; input.dispatchEvent(new app.window.Event('input'));
+    app.key(40); app.key(40, 'keyup');
+    app.key(69, 'keydown', { key: 'e' });
+    assert.equal(input.value, 'vide');
+    assert.equal(app.document.activeElement, app.document.querySelector('#searchRows .srow'));
 });
 
 test('remote navigation, repeating arrows, focus restoration and overlays stay usable', async t => {

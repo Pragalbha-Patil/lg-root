@@ -97,7 +97,7 @@ See [testing](docs/TESTING.md) for Windows guidance and validation commands.
 | Move between tiles | D-pad |
 | Launch a tile | OK |
 | Open a tile's pin/hide menu | Menu/Info or hold OK |
-| Search apps | Type a letter on a connected keyboard |
+| Search apps | Header Search button, or type a letter on a connected keyboard |
 | Close an overlay | Back |
 | Open launcher preferences | Settings tile or header gear |
 | Temporarily return to stock Home | LG Home tile |

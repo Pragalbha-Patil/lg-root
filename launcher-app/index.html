@@ -109,7 +109,8 @@ h1 b {
   height: 28px;
   background: rgba(255, 255, 255, 0.12);
 }
-#settingsBtn {
+#settingsBtn,
+#searchBtn {
   display: flex;
   align-items: center;
   gap: 11px;
@@ -125,10 +126,17 @@ h1 b {
     background 0.13s,
     border-color 0.13s;
 }
-#settingsBtn .gear {
+#settingsBtn .gear,
+#searchBtn .gear {
   font-size: 22px;
 }
-#settingsBtn:focus {
+#searchBtn .gear svg {
+  display: block;
+  width: 22px;
+  height: 22px;
+}
+#settingsBtn:focus,
+#searchBtn:focus {
   outline: none;
   background: rgba(255, 255, 255, 0.15);
   border-color: var(--accent);
@@ -510,17 +518,22 @@ h1 b {
   opacity: 1;
   pointer-events: auto;
 }
-.search .q {
-  font-size: 32px;
-  font-weight: 200;
-  color: #e8ecf1;
-  letter-spacing: 2px;
-  border-bottom: 2px solid var(--accent-soft);
-  padding-bottom: 16px;
+#searchInput {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 15px 18px;
+  border: 2px solid #343d4e;
+  border-radius: 14px;
+  outline: none;
+  background: #171a21;
+  color: #eef3f9;
+  font: inherit;
+  font-size: 24px;
   margin-bottom: 18px;
 }
-.search .q b {
-  color: var(--accent);
+#searchInput:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
 }
 .search .hint {
   font-size: 14px;
@@ -578,6 +591,7 @@ h1 b {
 <h1 id="headLine"><span id="headText">WELCOME</span> <b id="headBrand">Minimal Home</b></h1>
 <div class="hright">
 <div id="sysStats" aria-hidden="true"><div class="stat"><span class="label">CPU</span><span class="value" id="statCpu">--%</span></div><div class="sep"></div><div class="stat"><span class="label">RAM</span><span class="value" id="statRam">--%</span></div><div class="sep"></div><div class="stat"><span class="label">Temp</span><span class="value" id="statTemp">--&deg;C</span></div></div>
+<div id="searchBtn" class="tile" tabindex="0" role="button" aria-label="Search"><span class="gear"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2.5"/><line x1="15.5" y1="15.5" x2="21" y2="21" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg></span><span>Search</span></div>
 <div id="settingsBtn" class="tile" tabindex="0" role="button" aria-label="Settings"><span class="gear">&#9881;</span><span>Settings</span></div>
 <div id="clock">--:--<small></small></div>
 </div>
@@ -632,10 +646,10 @@ h1 b {
   <div class="panel-head">Options</div>
   <div id="optionsRows" class="rowset"></div>
 </div>
-<div id="searchBox" class="search">
-  <div id="searchQ" class="q"></div>
+<div id="searchBox" class="search" role="dialog" aria-modal="true" aria-label="Search apps">
+  <input id="searchInput" type="text" maxlength="100" autocomplete="off" aria-label="Search apps">
   <div id="searchRows" class="rowset"></div>
-  <div class="hint">type to find an app &#183; &#8592; &#8594; to move &#183; OK to open &#183; BACK to close</div>
+  <div class="hint">type to find an app &#183; &#8593; &#8595; to move &#183; OK to open &#183; BACK to close</div>
 </div>
 
 <script>
@@ -1856,13 +1870,17 @@ window.MH_CONFIG = {"version": "v1.6.0", "system": ["com.webos.app.discovery", "
     launchFromId(id);
   }
   var searchQ = "";
+  function searchInput() {
+    return document.getElementById("searchInput");
+  }
   function openSearch(ch) {
     lastFocusEl = document.activeElement;
     overlay.mode = "search";
     searchQ = ch || "";
     renderSearch();
     showOverlay("searchBox");
-    focusFirst("#searchRows .srow");
+    searchInput().value = searchQ;
+    searchInput().focus();
   }
   function searchMatches() {
     var q = searchQ.toLowerCase();
@@ -1879,27 +1897,32 @@ window.MH_CONFIG = {"version": "v1.6.0", "system": ["com.webos.app.discovery", "
     return starts.concat(cont).slice(0, 8);
   }
   function renderSearch() {
-    document.getElementById("searchQ").textContent = searchQ
-      ? "“" + searchQ + "”"
-      : "“”";
+    var input = searchInput();
+    if (document.activeElement !== input) input.value = searchQ;
     var list = searchMatches();
-    var html = list.length
-      ? list
-          .map(function (t) {
-            return (
-              '<div class="srow" tabindex="0" data-id="' +
-              esc(t.id) +
-              '"><span class="sl">' +
-              esc(t.title || t.id) +
-              '</span><span class="small">' +
-              esc(t.id) +
-              "</span></div>"
-            );
-          })
-          .join("")
-      : '<div class="srow" tabindex="0" data-key="none"><span class="sl">No matches</span></div>';
+    var html;
+    if (!searchQ) {
+      html =
+        '<div class="srow" tabindex="0" data-key="none"><span class="sl">Type to search installed apps</span></div>';
+    } else if (list.length) {
+      html = list
+        .map(function (t) {
+          return (
+            '<div class="srow" tabindex="0" data-id="' +
+            esc(t.id) +
+            '"><span class="sl">' +
+            esc(t.title || t.id) +
+            '</span><span class="small">' +
+            esc(t.id) +
+            "</span></div>"
+          );
+        })
+        .join("");
+    } else {
+      html =
+        '<div class="srow" tabindex="0" data-key="none"><span class="sl">No matches</span></div>';
+    }
     document.getElementById("searchRows").innerHTML = html;
-    focusFirst("#searchRows .srow");
   }
   function activateBrandRow(el) {
     var key = el.getAttribute("data-key");
@@ -1992,12 +2015,26 @@ window.MH_CONFIG = {"version": "v1.6.0", "system": ["com.webos.app.discovery", "
       return false;
     return true;
   }
-  function overlayBackKey(kc) {
-    if (kc === 8 && overlay.mode === "search" && searchQ) {
-      searchQ = searchQ.slice(0, -1);
-      renderSearch();
+  function searchBackKey(kc) {
+    // While the field is focused the on-screen keyboard owns editing: Back
+    // dismisses it by leaving the field, and only a later Back closes search.
+    if (document.activeElement === searchInput()) {
+      if (kc === 8) return false;
+      searchInput().blur();
+      focusFirst("#searchRows .srow");
       return true;
     }
+    if (kc === 8 && searchQ) {
+      searchQ = searchQ.slice(0, -1);
+      renderSearch();
+      focusFirst("#searchRows .srow");
+      return true;
+    }
+    hideOverlay();
+    return true;
+  }
+  function overlayBackKey(kc) {
+    if (overlay.mode === "search") return searchBackKey(kc);
     if (overlay.mode === "brand") return brandBackKey();
     if (overlay.mode === "confirm") {
       closeConfirmReset(false);
@@ -2031,17 +2068,26 @@ window.MH_CONFIG = {"version": "v1.6.0", "system": ["com.webos.app.discovery", "
     changeSetting(row.getAttribute("data-key"), dir === "left" ? -1 : 1);
     return true;
   }
+  function searchDirKey(dir) {
+    if (
+      document.activeElement === searchInput() &&
+      (dir === "left" || dir === "right")
+    )
+      return false;
+    moveFocusIn("#searchInput, #searchRows .srow", dir);
+    return true;
+  }
   function overlayDirKey(dir) {
     if (overlay.mode === "brand") return brandDirKey(dir);
     if (overlay.mode === "settings") return settingsDirKey(dir);
+    if (overlay.mode === "search") return searchDirKey(dir);
     if (overlay.mode === "confirm") {
       moveFocusIn("#confirmPanel .srow", dir);
       return true;
     }
     var selectors = {
       options: "#optionsRows .optrow",
-      manage: "#optionsRows .optrow, #optionsRows .srow",
-      search: "#searchRows .srow"
+      manage: "#optionsRows .optrow, #optionsRows .srow"
     };
     moveFocusIn(selectors[overlay.mode], dir);
     return true;
@@ -2053,8 +2099,9 @@ window.MH_CONFIG = {"version": "v1.6.0", "system": ["com.webos.app.discovery", "
     if (dir) return overlayDirKey(dir);
     if (kc === 13) {
       if (
-        overlay.mode === "brand" &&
-        document.activeElement === document.getElementById("brandInput")
+        (overlay.mode === "brand" &&
+          document.activeElement === document.getElementById("brandInput")) ||
+        (overlay.mode === "search" && document.activeElement === searchInput())
       )
         return false;
       e.preventDefault();
@@ -2063,6 +2110,7 @@ window.MH_CONFIG = {"version": "v1.6.0", "system": ["com.webos.app.discovery", "
       return true;
     }
     if (overlay.mode === "search") {
+      if (document.activeElement === searchInput()) return false;
       if (
         e.key &&
         e.key.length === 1 &&
@@ -2073,6 +2121,7 @@ window.MH_CONFIG = {"version": "v1.6.0", "system": ["com.webos.app.discovery", "
       ) {
         searchQ += e.key;
         renderSearch();
+        focusFirst("#searchRows .srow");
         return true;
       }
     }
@@ -2230,6 +2279,10 @@ window.MH_CONFIG = {"version": "v1.6.0", "system": ["com.webos.app.discovery", "
       openSettingsPanel();
       return;
     }
+    if (el0.id === "searchBtn") {
+      openSearch("");
+      return;
+    }
     if (el0.className && (" " + el0.className + " ").indexOf(" tile ") >= 0)
       doLaunch(el0);
   }
@@ -2244,7 +2297,8 @@ window.MH_CONFIG = {"version": "v1.6.0", "system": ["com.webos.app.discovery", "
       if (
         el0 &&
         el0.className &&
-        (" " + el0.className + " ").indexOf(" tile ") >= 0
+        (" " + el0.className + " ").indexOf(" tile ") >= 0 &&
+        el0.getAttribute("data-id")
       )
         openOptions(el0);
     }, 700);
@@ -2254,7 +2308,8 @@ window.MH_CONFIG = {"version": "v1.6.0", "system": ["com.webos.app.discovery", "
     if (
       el0 &&
       el0.className &&
-      (" " + el0.className + " ").indexOf(" tile ") >= 0
+      (" " + el0.className + " ").indexOf(" tile ") >= 0 &&
+      el0.getAttribute("data-id")
     )
       openOptions(el0);
   }
@@ -2320,6 +2375,13 @@ window.MH_CONFIG = {"version": "v1.6.0", "system": ["com.webos.app.discovery", "
   var sb = document.getElementById("settingsBtn");
   sb.addEventListener("click", function () {
     openSettingsPanel();
+  });
+  document.getElementById("searchBtn").addEventListener("click", function () {
+    openSearch("");
+  });
+  searchInput().addEventListener("input", function () {
+    searchQ = searchInput().value.slice(0, 100);
+    renderSearch();
   });
   document.getElementById("brandInput").addEventListener("input", function () {
     document.getElementById("brandError").textContent = "";

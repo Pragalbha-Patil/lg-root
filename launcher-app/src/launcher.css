@@ -102,7 +102,8 @@ h1 b {
   height: 28px;
   background: rgba(255, 255, 255, 0.12);
 }
-#settingsBtn {
+#settingsBtn,
+#searchBtn {
   display: flex;
   align-items: center;
   gap: 11px;
@@ -118,10 +119,17 @@ h1 b {
     background 0.13s,
     border-color 0.13s;
 }
-#settingsBtn .gear {
+#settingsBtn .gear,
+#searchBtn .gear {
   font-size: 22px;
 }
-#settingsBtn:focus {
+#searchBtn .gear svg {
+  display: block;
+  width: 22px;
+  height: 22px;
+}
+#settingsBtn:focus,
+#searchBtn:focus {
   outline: none;
   background: rgba(255, 255, 255, 0.15);
   border-color: var(--accent);
@@ -503,17 +511,22 @@ h1 b {
   opacity: 1;
   pointer-events: auto;
 }
-.search .q {
-  font-size: 32px;
-  font-weight: 200;
-  color: #e8ecf1;
-  letter-spacing: 2px;
-  border-bottom: 2px solid var(--accent-soft);
-  padding-bottom: 16px;
+#searchInput {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 15px 18px;
+  border: 2px solid #343d4e;
+  border-radius: 14px;
+  outline: none;
+  background: #171a21;
+  color: #eef3f9;
+  font: inherit;
+  font-size: 24px;
   margin-bottom: 18px;
 }
-.search .q b {
-  color: var(--accent);
+#searchInput:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
 }
 .search .hint {
   font-size: 14px;
