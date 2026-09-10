@@ -271,6 +271,19 @@
       }
     );
   }
+  var DATE_FORMAT_NAMES = {
+    "HH:mm": "24-hour",
+    "h:mm A": "12-hour",
+    "HH:mm:ss": "24-hour + seconds",
+    "h:mm:ss A": "12-hour + seconds",
+    "MMM D, HH:mm": "Date + 24-hour",
+    "MMM D, h:mm A": "Date + 12-hour",
+    "YYYY-MM-DD HH:mm": "ISO date + time",
+    "DD/MM/YYYY HH:mm": "Day-first date + time"
+  };
+  function dateFormatName(fmt) {
+    return DATE_FORMAT_NAMES[fmt] || fmt;
+  }
   function tick() {
     clearTimeout(clockTimer);
     clockTimer = null;
@@ -545,11 +558,11 @@
     },
     {
       key: "dateFormat",
-      label: "Date format",
+      label: "Clock format",
       type: "choice",
       opts: M.choices.dateFormat,
       fmt: function (v) {
-        return v;
+        return esc(dateFormatName(v)) + " · " + esc(formatDate(new Date(), v));
       }
     },
     {

@@ -224,6 +224,32 @@ test('back never closes the brand name editor', t => {
     assert.equal(settings.calls.filter(c => c.method === 'setPrefs').length, 0);
 });
 
+test('clock format row shows friendly names with live previews', t => {
+    const app = appFor(t); ready(app);
+    app.click('#settingsBtn');
+    const names = {
+        'HH:mm': '24-hour',
+        'h:mm A': '12-hour',
+        'HH:mm:ss': '24-hour + seconds',
+        'h:mm:ss A': '12-hour + seconds',
+        'MMM D, HH:mm': 'Date + 24-hour',
+        'MMM D, h:mm A': 'Date + 12-hour',
+        'YYYY-MM-DD HH:mm': 'ISO date + time',
+        'DD/MM/YYYY HH:mm': 'Day-first date + time'
+    };
+    assert.equal(row(app, 'dateFormat').querySelector('.sl').textContent, 'Clock format');
+    for (const token of Object.keys(names)) {
+        const val = row(app, 'dateFormat').querySelector('.val').textContent;
+        assert.ok(val.startsWith(names[token]), token + ' shows a friendly name, got ' + val);
+        assert.match(val, /\d/, token + ' shows a live preview');
+        app.click('[data-key="dateFormat"]');
+    }
+    for (let i = 0; i < 8; i++) {
+        if (!app.calls.some(c => c.method === 'setPrefs' && !c.answered)) break;
+        save(app);
+    }
+});
+
 test('grouped settings keep remote navigation on controls across section headings', t => {
     const app = appFor(t); ready(app); app.click('#settingsBtn');
     assert.deepEqual([...app.document.querySelectorAll('#settingsRows h2')].map(el => el.textContent),
