@@ -83,8 +83,9 @@ row; Back closes the panel.
 Preferences include the header brand name, accent color, tile size, labels, clock
 options, date format, sort mode, and system statistics. A brand saved through the
 launcher takes precedence over `header.brand` and can be edited again from the
-Brand name row. Use the per-tile menu to pin/unpin or hide an app;
-restore hidden apps from Settings. App labels affects tile captions only, not
+Brand name row. Use the per-tile menu to pin/unpin or hide an app; pinned apps
+can be reordered from the same menu with Move (unavailable under Alphabetical
+sorting, which ignores pin ordering). Restore hidden apps from Settings. App labels affects tile captions only, not
 CPU/RAM/temperature captions; tiles retain accessible names when captions are hidden.
 Reset all restores defaults.
 

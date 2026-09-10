@@ -97,6 +97,7 @@ See [testing](docs/TESTING.md) for Windows guidance and validation commands.
 | Move between tiles | D-pad |
 | Launch a tile | OK |
 | Open a tile's pin/hide menu | Menu/Info or hold OK |
+| Reorder pinned apps | Tile menu → Move, then ← → · OK saves · Back cancels |
 | Search apps | Header Search button, or type a letter on a connected keyboard |
 | Close an overlay | Back |
 | Open launcher preferences | Settings tile or header gear |
