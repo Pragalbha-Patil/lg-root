@@ -148,6 +148,20 @@ test('periodic provisioning requests launch points and copies the returned icons
     assert.ok(w.disk.files.has(C.APP_DIR + '/icons/video.png'));
 });
 
+test('failed discovery preserves cached icons while confirmed discovery prunes', async () => {
+    const w = watcher();
+    const cached = C.APP_DIR + '/icons/video.png';
+    const stale = C.APP_DIR + '/icons/stale.png';
+    w.disk.files.set(cached, 'cached'); w.disk.files.set(stale, 'stale');
+    const failed = w.context.runProvision(); w.respond('', new Error('offline')); await failed;
+    assert.equal(w.disk.files.get(cached).toString(), 'cached');
+    assert.equal(w.disk.files.get(stale).toString(), 'stale');
+    const confirmed = w.context.runProvision();
+    w.respond({ returnValue: true, launchPoints: [] }); await confirmed;
+    assert.equal(w.disk.files.has(stale), false);
+});
+
+
 test('initial icon provisioning is scheduled immediately', async () => {
     const w = watcher(); w.disk.files.set('/icon', 'icon');
     const task = w.clock.run(0);
