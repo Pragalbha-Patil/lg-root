@@ -13,6 +13,14 @@ and changes that can be tested without a TV.
   malformed required config into defaults.
 - Prefer a small helper when it removes meaningful duplication. Avoid adding a
   framework for a single use case.
+- Keep block nesting shallow: at most two levels of `if`/`for`/`while`/`try`
+  inside a function (`else if` chains do not count). Prefer guard clauses and
+  early returns over nested conditionals; extract a named helper when a branch
+  needs its own structure, and use a dispatch table instead of a long
+  mode/type switch. ESLint enforces this depth limit for shipped JavaScript
+  (test harnesses are excluded; table-driven test loops stay readable as-is),
+  and `python tools/check.py` enforces the same limit for `build_launcher.py`
+  and `tools/*.py` via a standard-library AST check.
 - Use UTF-8, LF line endings, and a final newline. Editor defaults live in
   `.editorconfig`; shell LF behavior is enforced by `.gitattributes` and checks.
 

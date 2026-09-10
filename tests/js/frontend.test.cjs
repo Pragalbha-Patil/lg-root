@@ -422,6 +422,19 @@ test('failed discovery stops spinning after bounded retries and Retry recovers',
 });
 
 
+test('arrow navigation from the retry tile keeps focus when nothing wraps', async t => {
+    const app = appFor(t);
+    for (let i = 0; i < 6; i++) {
+        app.respond('getTiles', { returnValue: false });
+        if (i < 5) await app.clock.run(2500);
+    }
+    const retry = app.document.querySelector('#retryTiles');
+    retry.focus();
+    app.key(40); app.key(40, 'keyup');
+    assert.equal(app.document.activeElement, retry);
+});
+
+
 test('explicit desktop preview tiles retain their click handlers', t => {
     const app = appFor(t, { prepare(window) {
         window.document.querySelector('#grid').innerHTML = '<div class="tile" tabindex="0" data-id="preview">Preview</div>';

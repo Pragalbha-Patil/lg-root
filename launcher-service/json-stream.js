@@ -6,34 +6,44 @@ module.exports = function (limit) {
         depth = 0,
         quoted = false,
         escaped = false;
+    function reset() {
+        buffer = '';
+        depth = 0;
+        quoted = false;
+        escaped = false;
+    }
+    function scanBare(character) {
+        if (character === '"') quoted = true;
+        else if (character === '{') depth++;
+        else if (character === '}') depth--;
+    }
+    function scan(character) {
+        buffer += character;
+        if (!quoted) return scanBare(character);
+        if (escaped) {
+            escaped = false;
+            return;
+        }
+        if (character === '\\') escaped = true;
+        else if (character === '"') quoted = false;
+    }
     return function (chunk) {
         var objects = [];
         for (var i = 0; i < chunk.length; i++) {
             var character = chunk[i];
             if (depth === 0 && character !== '{') continue;
-            buffer += character;
+            scan(character);
             if (buffer.length > limit) {
-                buffer = '';
-                depth = 0;
-                quoted = false;
-                escaped = false;
+                reset();
                 break;
             }
-            if (quoted) {
-                if (escaped) escaped = false;
-                else if (character === '\\') escaped = true;
-                else if (character === '"') quoted = false;
-            } else if (character === '"') quoted = true;
-            else if (character === '{') depth++;
-            else if (character === '}') depth--;
-            if (depth === 0) {
-                try {
-                    objects.push(JSON.parse(buffer));
-                } catch (ignored) {
-                    /* Skip malformed frames. */
-                }
-                buffer = '';
+            if (depth !== 0) continue;
+            try {
+                objects.push(JSON.parse(buffer));
+            } catch (ignored) {
+                /* Skip malformed frames. */
             }
+            buffer = '';
         }
         return objects;
     };

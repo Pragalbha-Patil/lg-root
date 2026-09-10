@@ -93,6 +93,43 @@ function copyIcon(source, destination) {
     return true;
 }
 
+function tryCopyIcon(source, destination) {
+    try {
+        return copyIcon(source, destination);
+    } catch (error) {
+        log({ iconCopy: String(error) });
+        return false;
+    }
+}
+
+function provisionPoint(point, keep) {
+    // Returns null for records without a usable id, otherwise whether an
+    // icon candidate was copied. Every valid point joins the keep set even
+    // when its sources fail, so pruning never removes a known app.
+    if (!point || !M.validId(point.id)) return null;
+    const destination = path.join(ICON_DIR, point.id + '.png');
+    keep.add(point.id + '.png');
+    const candidates = [point.largeIcon, point.icon];
+    for (const source of new Set(candidates)) {
+        if (tryCopyIcon(source, destination)) return true;
+    }
+    return false;
+}
+
+function pruneIcon(name, keep) {
+    if (
+        !name.endsWith('.png') ||
+        !M.validId(name.slice(0, -4)) ||
+        keep.has(name)
+    )
+        return;
+    try {
+        fs.unlinkSync(path.join(ICON_DIR, name));
+    } catch (error) {
+        log({ iconCleanup: String(error) });
+    }
+}
+
 function provisionIcons(points) {
     if (!Array.isArray(points)) return;
     let copied = 0,
@@ -104,38 +141,15 @@ function provisionIcons(points) {
         log({ iconDirectory: String(error) });
     }
     points.forEach((point) => {
-        if (!point || !M.validId(point.id)) return;
-        const destination = path.join(ICON_DIR, point.id + '.png');
-        keep.add(point.id + '.png');
+        const provisioned = provisionPoint(point, keep);
+        if (provisioned === null) return;
         total++;
-        let good = false;
-        const candidates = [point.largeIcon, point.icon];
-        for (const source of new Set(candidates)) {
-            try {
-                if (copyIcon(source, destination)) {
-                    good = true;
-                    break;
-                }
-            } catch (error) {
-                log({ iconCopy: String(error) });
-            }
-        }
-        if (good) copied++;
+        if (provisioned) copied++;
         // A temporary source error must not delete last-known-good bytes.
     });
     try {
         fs.readdirSync(ICON_DIR).forEach((name) => {
-            if (
-                !name.endsWith('.png') ||
-                !M.validId(name.slice(0, -4)) ||
-                keep.has(name)
-            )
-                return;
-            try {
-                fs.unlinkSync(path.join(ICON_DIR, name));
-            } catch (error) {
-                log({ iconCleanup: String(error) });
-            }
+            pruneIcon(name, keep);
         });
     } catch (error) {
         log({ iconPrune: String(error) });
@@ -154,104 +168,111 @@ function provisionSettingsIcon() {
 var lastCpuTotal = null;
 var lastCpuIdle = null;
 
+function statsVisible() {
+    try {
+        var prefs = JSON.parse(fs.readFileSync(C.PREFS_FILE, 'utf8'));
+        return prefs.showSystemStats !== false;
+    } catch (e) {
+        return true;
+    }
+}
+
+function readCpuUsage() {
+    try {
+        var stat = fs.readFileSync('/proc/stat', 'utf8');
+        var m = stat.match(/^cpu\s+([^\n]+)/);
+        if (!m) return null;
+        // Guest time is already included in user/nice; count only the first eight fields.
+        var fields = m[1].trim().split(/\s+/).slice(0, 8).map(Number);
+        var idle = fields[3] + (fields[4] || 0);
+        var total = fields.reduce(function (sum, value) {
+            return sum + value;
+        }, 0);
+        var usage = null;
+        if (typeof lastCpuTotal === 'number' && total > lastCpuTotal) {
+            var diffTotal = total - lastCpuTotal;
+            var diffIdle = idle - (lastCpuIdle || 0);
+            usage = Math.max(
+                0,
+                Math.min(
+                    100,
+                    Math.round((100 * (diffTotal - diffIdle)) / diffTotal)
+                )
+            );
+        }
+        lastCpuTotal = total;
+        lastCpuIdle = idle;
+        return usage;
+    } catch (e) {
+        log({ cpuErr: String((e && e.message) || e) });
+        return null;
+    }
+}
+
+function readRamUsage() {
+    try {
+        var mem = fs.readFileSync('/proc/meminfo', 'utf8');
+        var memoryTotal = parseInt(
+            (mem.match(/MemTotal:\s+(\d+)/) || [])[1] || '0',
+            10
+        );
+        var avail = parseInt(
+            (mem.match(/MemAvailable:\s+(\d+)/) || [])[1] || '0',
+            10
+        );
+        if (memoryTotal <= 0 || !/MemAvailable:/.test(mem)) return null;
+        return M.metric(
+            Math.round((100 * (memoryTotal - avail)) / memoryTotal),
+            0,
+            100
+        );
+    } catch (e) {
+        log({ ramErr: String((e && e.message) || e) });
+        return null;
+    }
+}
+
+function readZoneTemp(tz) {
+    if (!/^thermal_zone\d+$/.test(tz)) return null;
+    var t;
+    try {
+        t = fs
+            .readFileSync('/sys/class/thermal/' + tz + '/temp', 'utf8')
+            .trim();
+    } catch (error) {
+        return null;
+    }
+    return M.metric(Math.round(parseInt(t, 10) / 1000), -100, 200);
+}
+
+function firstZoneTemp(zones) {
+    for (var i = 0; i < zones.length; i++) {
+        var tempC = readZoneTemp(zones[i]);
+        if (tempC !== null) return tempC;
+    }
+    return null;
+}
+
+function readTempC() {
+    try {
+        return firstZoneTemp(fs.readdirSync('/sys/class/thermal'));
+    } catch (e) {
+        log({ tempErr: String((e && e.message) || e) });
+        return null;
+    }
+}
+
 function collectSystemStats() {
     try {
-        var showStats = true;
-        try {
-            var prefs = JSON.parse(fs.readFileSync(C.PREFS_FILE, 'utf8'));
-            showStats = prefs.showSystemStats !== false;
-        } catch (e) {}
-        if (!showStats) {
+        if (!statsVisible()) {
             lastCpuTotal = null;
             lastCpuIdle = null;
             return;
         }
-
-        // CPU
-        var cpuUsage = null;
-        try {
-            var stat = fs.readFileSync('/proc/stat', 'utf8');
-            var m = stat.match(/^cpu\s+([^\n]+)/);
-            if (m) {
-                // Guest time is already included in user/nice; count only the first eight fields.
-                var fields = m[1].trim().split(/\s+/).slice(0, 8).map(Number);
-                var idle = fields[3] + (fields[4] || 0);
-                var total = fields.reduce(function (sum, value) {
-                    return sum + value;
-                }, 0);
-                if (typeof lastCpuTotal === 'number' && total > lastCpuTotal) {
-                    var diffTotal = total - lastCpuTotal;
-                    var diffIdle = idle - (lastCpuIdle || 0);
-                    cpuUsage = Math.max(
-                        0,
-                        Math.min(
-                            100,
-                            Math.round(
-                                (100 * (diffTotal - diffIdle)) / diffTotal
-                            )
-                        )
-                    );
-                }
-                lastCpuTotal = total;
-                lastCpuIdle = idle;
-            }
-        } catch (e) {
-            log({ cpuErr: String((e && e.message) || e) });
-        }
-
-        // RAM
-        var ramUsage = null;
-        try {
-            var mem = fs.readFileSync('/proc/meminfo', 'utf8');
-            var memoryTotal = parseInt(
-                (mem.match(/MemTotal:\s+(\d+)/) || [])[1] || '0',
-                10
-            );
-            var avail = parseInt(
-                (mem.match(/MemAvailable:\s+(\d+)/) || [])[1] || '0',
-                10
-            );
-            if (memoryTotal > 0 && /MemAvailable:/.test(mem))
-                ramUsage = M.metric(
-                    Math.round((100 * (memoryTotal - avail)) / memoryTotal),
-                    0,
-                    100
-                );
-        } catch (e) {
-            log({ ramErr: String((e && e.message) || e) });
-        }
-
-        // Temp
-        var tempC = null;
-        try {
-            var zones = fs.readdirSync('/sys/class/thermal');
-            for (var i = 0; i < zones.length; i++) {
-                var tz = zones[i];
-                if (/^thermal_zone\d+$/.test(tz)) {
-                    var t;
-                    try {
-                        t = fs
-                            .readFileSync(
-                                '/sys/class/thermal/' + tz + '/temp',
-                                'utf8'
-                            )
-                            .trim();
-                    } catch (error) {
-                        continue;
-                    }
-                    var tc = parseInt(t, 10);
-                    tempC = M.metric(Math.round(tc / 1000), -100, 200);
-                    if (tempC !== null) break;
-                }
-            }
-        } catch (e) {
-            log({ tempErr: String((e && e.message) || e) });
-        }
-
         store.writeJson(STATS_FILE, {
-            cpu: M.metric(cpuUsage, 0, 100),
-            ram: ramUsage,
-            temp: tempC,
+            cpu: M.metric(readCpuUsage(), 0, 100),
+            ram: readRamUsage(),
+            temp: readTempC(),
             timestamp: Date.now()
         });
     } catch (e) {
@@ -268,6 +289,17 @@ async function runProvision() {
     } catch (e) {
         log({ provErr: String((e && e.message) || e) });
     }
+}
+
+function redirectFailed() {
+    if (foregroundApp !== HOME_ID) return;
+    fails++;
+    const backoff =
+        fails < 5
+            ? 2000
+            : Math.min(5 * 60 * 1000, 30000 * Math.pow(2, fails - 5));
+    log({ redirectFail: true, fails, retryInMs: backoff });
+    scheduleRetry(backoff);
 }
 
 async function redirectLoop() {
@@ -289,20 +321,27 @@ async function redirectLoop() {
             lastRedirect = foregroundApp === HOME_ID ? Date.now() : 0;
             log({ redirect: true });
         } else {
-            if (foregroundApp !== HOME_ID) return;
-            fails++;
-            const backoff =
-                fails < 5
-                    ? 2000
-                    : Math.min(5 * 60 * 1000, 30000 * Math.pow(2, fails - 5));
-            log({ redirectFail: true, fails, retryInMs: backoff });
-            scheduleRetry(backoff);
+            redirectFailed();
         }
     } catch (e) {
         log({ tickErr: String((e && e.message) || e) });
     } finally {
         redirecting = false;
     }
+}
+
+function bypassActive() {
+    // True while a stored bypass pauses Home redirection; removes the file
+    // once it expires. Filesystem failures fail open toward redirecting.
+    try {
+        if (!fs.existsSync(BYPASS_FILE)) return false;
+        if (Date.now() < parseInt(fs.readFileSync(BYPASS_FILE, 'utf8'), 10))
+            return true;
+        try {
+            fs.unlinkSync(BYPASS_FILE);
+        } catch (e) {}
+    } catch (e) {}
+    return false;
 }
 
 async function onForeground(appId) {
@@ -315,23 +354,16 @@ async function onForeground(appId) {
         retryTimer = null;
     }
     try {
-        if (!appId || appId !== HOME_ID) {
-            if (appId !== HOME_ID) fails = 0;
+        if (!appId) return;
+        if (appId !== HOME_ID) {
+            fails = 0;
             return;
         }
         if (!fs.existsSync(FIRSTUSE)) return;
-        try {
-            if (fs.existsSync(BYPASS_FILE)) {
-                const exp = parseInt(fs.readFileSync(BYPASS_FILE, 'utf8'), 10);
-                if (Date.now() < exp) {
-                    fails = 0;
-                    return;
-                }
-                try {
-                    fs.unlinkSync(BYPASS_FILE);
-                } catch (e) {}
-            }
-        } catch (e) {}
+        if (bypassActive()) {
+            fails = 0;
+            return;
+        }
         if (retryTimer === null) redirectLoop();
     } catch (e) {
         log({ tickErr: String((e && e.message) || e) });

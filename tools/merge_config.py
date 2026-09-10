@@ -6,24 +6,32 @@ from pathlib import Path
 import sys
 
 
+def _validate_header(header):
+    if header is None:
+        return
+    if not isinstance(header, dict):
+        raise ValueError("installed config header must contain an object")
+    for key in ("text", "brand"):
+        if key in header and not isinstance(header[key], str):
+            raise ValueError("installed config header.%s must be a string" % key)
+
+
+def _validate_ui(ui):
+    if ui is None:
+        return
+    if not isinstance(ui, dict):
+        raise ValueError("installed config ui must contain an object")
+    for key in ("system", "appsPriority"):
+        if key in ui and (not isinstance(ui[key], list) or
+                          not all(isinstance(value, str) for value in ui[key])):
+            raise ValueError("installed config ui.%s must be an array of strings" % key)
+
+
 def _validate_custom_config(config):
     if not isinstance(config, dict):
         raise ValueError("installed config must contain an object")
-    header = config.get("header")
-    if header is not None:
-        if not isinstance(header, dict):
-            raise ValueError("installed config header must contain an object")
-        for key in ("text", "brand"):
-            if key in header and not isinstance(header[key], str):
-                raise ValueError("installed config header.%s must be a string" % key)
-    ui = config.get("ui")
-    if ui is not None:
-        if not isinstance(ui, dict):
-            raise ValueError("installed config ui must contain an object")
-        for key in ("system", "appsPriority"):
-            if key in ui and (not isinstance(ui[key], list) or
-                              not all(isinstance(value, str) for value in ui[key])):
-                raise ValueError("installed config ui.%s must be an array of strings" % key)
+    _validate_header(config.get("header"))
+    _validate_ui(config.get("ui"))
 
 
 def _merge(new, installed, top_level=False):
