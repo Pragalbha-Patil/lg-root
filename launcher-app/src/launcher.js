@@ -799,7 +799,11 @@
     var update = M.cleanPrefs(prefs);
     Object.keys(update).forEach(function (key) {
       PREFS[key] = update[key];
-      lastSavedPrefs[key] = update[key];
+      // Arrays are shared by reference: pin/hide edits mutate PREFS in
+      // place, so the snapshot needs its own copy to diff against.
+      lastSavedPrefs[key] = Array.isArray(update[key])
+        ? update[key].slice()
+        : update[key];
     });
     applyPrefs();
   }
