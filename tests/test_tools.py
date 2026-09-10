@@ -1,7 +1,9 @@
 """Host tooling regressions: deterministic builds, packages, and installer failures."""
 
 import copy
+import gzip
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -14,7 +16,7 @@ import unittest
 from unittest.mock import patch
 
 import build_launcher as bl
-from tools import check, merge_config, package
+from tools import check, make_ipk, merge_config, package
 
 ROOT = Path(__file__).resolve().parents[1]
 SHELL = check.find_shell()
@@ -125,6 +127,36 @@ class PackagingTest(unittest.TestCase):
             actual = {p.relative_to(staged).as_posix() for p in staged.rglob("*") if p.is_file()}
             self.assertEqual(actual, set(package.RUNTIME_FILES))
 
+    def test_ipk_contains_only_staged_app_service_and_package_metadata(self):
+        with tempfile.TemporaryDirectory() as temp:
+            staged = Path(temp) / "staged"
+            package.stage(staged)
+            first = Path(temp) / "first.ipk"
+            second = Path(temp) / "second.ipk"
+            make_ipk.build(staged, first)
+            make_ipk.build(staged, second)
+            self.assertEqual(first.read_bytes(), second.read_bytes())
+
+            payload = first.read_bytes()
+            self.assertTrue(payload.startswith(b"!<arch>\n"))
+            members = {}
+            offset = 8
+            while offset < len(payload):
+                header = payload[offset:offset + 60]
+                size = int(header[48:58])
+                name = header[:16].decode("ascii").strip().rstrip("/")
+                start = offset + 60
+                members[name] = payload[start:start + size]
+                offset = start + size + (size % 2)
+            self.assertEqual(set(members), {"debian-binary", "control.tar.gz", "data.tar.gz"})
+            with tarfile.open(fileobj=io.BytesIO(gzip.decompress(members["data.tar.gz"]))) as archive:
+                names = set(archive.getnames())
+                self.assertIn("usr/palm/applications/org.minimal.home/appinfo.json", names)
+                self.assertIn("usr/palm/services/org.minimal.home.service/service.js", names)
+                self.assertIn("usr/palm/packages/org.minimal.home/packageinfo.json", names)
+                self.assertNotIn("usr/palm/applications/org.minimal.home/src/launcher.js", names)
+                self.assertNotIn("usr/palm/applications/org.minimal.home/tiles.json", names)
+
     def test_mismatched_tag_fails_before_build_or_packaging(self):
         with patch.object(package.subprocess, "run") as run:
             with self.assertRaises(SystemExit) as error:
@@ -183,7 +215,8 @@ class InstallerTest(unittest.TestCase):
         self.env = dict(os.environ, TV_HOST="example-tv", TV_USER="root",
                         PYTHON=Path(sys.executable).as_posix(), MH_CALL_LOG=self.log.as_posix(),
                         MH_TEST_BIN=self.bin.as_posix(),
-                        MH_RESPONSE='{"returnValue":true}', MH_SSH_EXIT="0", MH_SCP_EXIT="0",
+                        MH_RESPONSE='{"returnValue":true}', MH_INSTALL_RESPONSE='{"state":"installed"}',
+                        MH_SSH_EXIT="0", MH_SCP_EXIT="0",
                         MH_CONFIG_PRESENT="1",
                         MH_INSTALLED_CONFIG='{"version":"1.0.0","header":{"text":"Hello TV"},'
                         '"ui":{"system":[],"appsPriority":["custom.app"]}}')
@@ -199,6 +232,8 @@ class InstallerTest(unittest.TestCase):
         self.stub("ssh", 'printf "ssh\\n" >> "$MH_CALL_LOG"\nprintf "%s\\n" "$@" >> "$MH_CALL_LOG"\n'
                   'if [ "$MH_SSH_EXIT" != 0 ]; then exit "$MH_SSH_EXIT"; fi\n'
                   'case "$*" in\n'
+                  '  *appInstallService*) printf "%s\\n" "$MH_INSTALL_RESPONSE"; '
+                  'case "$MH_INSTALL_RESPONSE" in *failed*) exit 1;; esac;;\n'
                   '  *luna-send*) printf "%s\\n" "$MH_RESPONSE";;\n'
                   '  *"if test -f"*)\n'
                   '    if [ "$MH_CONFIG_PRESENT" = 1 ]; then\n'
@@ -254,22 +289,43 @@ class InstallerTest(unittest.TestCase):
         result = self.install("--check")
         self.assertEqual(result.returncode, 0, result.stderr)
         calls = self.log.read_text()
-        self.assertIn("test -d", calls)
+        self.assertIn("test -x", calls)
+        self.assertIn("elevate-service", calls)
         self.assertNotIn("scp", calls)
         self.assertNotIn("mkdir", calls)
 
     def test_upload_sends_valid_launch_json(self):
         result = self.install("--no-build")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        command = next(line for line in self.log.read_text().splitlines() if "luna-send" in line)
+        command = next(
+            line for line in self.log.read_text().splitlines()
+            if "applicationManager/launch" in line
+        )
         payload = command.rsplit("'", 2)[1]
         self.assertEqual(json.loads(payload), {"id": "org.minimal.home"})
         self.assertIn("xargs -0 env", command)
         self.assertIn("/proc/$watcher/environ", command)
         calls = self.log.read_text()
         self.assertIn("chmod 1777", calls)
-        self.assertLess(calls.rfind("\nscp\n"), calls.find("chmod 1777"))
-        self.assertEqual(calls.splitlines().count("scp"), 2)
+        self.assertIn("appInstallService/dev/install", calls)
+        self.assertIn("elevate-service' org.minimal.home.service", calls)
+        self.assertIn("applicationManager/close", calls)
+        self.assertIn('$2 == "org.minimal.home.service"', calls)
+        self.assertIn("/var/lib/webosbrew/init.d/50-minimal-home", calls)
+        self.assertIn("com.palm.app.settings.png", calls)
+        self.assertIn('count + 1', calls)
+        self.assertIn("org.minimal.home-install-state", calls)
+        self.assertIn("|| cmp -s", calls)
+        self.assertLess(calls.find("cp -p"), calls.find("appInstallService/dev/install"))
+        self.assertGreater(calls.rfind("cp -p"), calls.find("appInstallService/dev/install"))
+        self.assertLess(calls.find("chmod 1777"), calls.rfind("cp -p"))
+        self.assertLess(calls.rfind("\nscp\n"), calls.find("appInstallService/dev/install"))
+        self.assertLess(calls.find("applicationManager/close"), calls.find("appInstallService/dev/install"))
+        self.assertLess(calls.find("elevate-service' org.minimal.home.service"),
+                        calls.find('$2 == "org.minimal.home.service"'))
+        self.assertLess(calls.find('$2 == "org.minimal.home.service"'),
+                        calls.find("applicationManager/launch"))
+        self.assertEqual(calls.splitlines().count("scp"), 1)
         self.assertIn("Preserved installed Minimal Home configuration.", result.stdout)
 
     def test_bundled_release_installer_preserves_config(self):
@@ -281,7 +337,7 @@ class InstallerTest(unittest.TestCase):
         result = self.install_script(release / "tools/install.sh")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("Preserved installed Minimal Home configuration.", result.stdout)
-        self.assertEqual(self.log.read_text().splitlines().count("scp"), 2)
+        self.assertEqual(self.log.read_text().splitlines().count("scp"), 1)
 
     def test_missing_config_is_a_first_install(self):
         self.env["MH_CONFIG_PRESENT"] = "0"
@@ -318,6 +374,14 @@ class InstallerTest(unittest.TestCase):
                 self.env["MH_RESPONSE"] = response
                 self.assertNotEqual(self.install("--no-build").returncode, 0)
                 self.assertIn("luna-send", self.log.read_text())
+
+    def test_install_service_failure_stops_before_hook_and_launch(self):
+        self.env["MH_INSTALL_RESPONSE"] = '{"state":"install failed"}'
+        result = self.install("--no-build")
+        self.assertNotEqual(result.returncode, 0)
+        calls = self.log.read_text()
+        self.assertNotIn("elevate-service' org.minimal.home.service", calls)
+        self.assertNotIn("50-minimal-home", calls)
 
 
 if __name__ == "__main__":

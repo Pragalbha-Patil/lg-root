@@ -36,7 +36,7 @@ tracked sources, although coverage/package checks create local `dist/` output.
 | Gate | Local command | Requirements / CI hosts |
 | --- | --- | --- |
 | Shared validation | `python tools/check.py --require-shell` | Python, supported Node, npm dev tools, POSIX sh; Linux and Windows |
-| Runtime packaging | `python tools/package.py` | Python, Git checkout and current generated output; Linux and Windows |
+| Runtime packaging | `python tools/package.py` | Python, Git checkout and current generated output; creates source archive and IPK |
 | Installer shell lint | `shellcheck tools/install.sh` | ShellCheck executable; Linux CI only |
 
 `--require-shell` requires **POSIX sh**, not ShellCheck. It enables `sh -n`

@@ -83,8 +83,8 @@ The bypass stores an expiry timestamp for ten minutes.
 
 The installer downloads and validates the service-local `config.json` before an
 update, merges its custom values over the new schema while retaining the new build
-version, and uploads only the merged result. Unshipped preferences, usage, bypass,
-and icon files remain in place.
+version, and places only the merged result in its allowlisted IPK. Unshipped
+preferences, usage, bypass, and icon files remain in place.
 
 The watcher writes icons inside the app's `icons/` directory and a temporary
 statistics sample at `/tmp/minhome-stats.json`. Logs are
@@ -117,9 +117,9 @@ These constraints come from project device observations, including webOS
   preventing bookmark `params.id` from replacing the target app ID.
 - The foreground subscription uses
   `com.webos.applicationManager/getForegroundAppInfo`, not `getForegroundApp`.
-- Some root SSH sessions lack the Luna preload environment even while boot-hook
-  processes can use Luna normally. The installer reuses a running Minimal Home
-  watcher's environment for its final launch request when available.
+- The installer uses `luna-send-pub` for developer IPK installation. Some root
+  SSH sessions lack Luna preload variables, so final launch reuses the running
+  Minimal Home watcher's bounded environment when available.
 - The jailed relay must create runtime state beside its service files. The
   installer gives that directory sticky shared-write permissions, preserving
   per-file ownership while allowing atomic preference and bypass writes.

@@ -12,5 +12,16 @@
   "noSplashOnLaunch": true,
   "disableBackHistoryAPI": true,
   "keepAlive": true,
-  "closeOnBackground": false
+  "closeOnBackground": false,
+  "requiredPermissions": [
+    "public",
+    "applications",
+    "applications.launch",
+    "applications.query",
+    "applications.internal"
+  ],
+  "requiredACG": [
+    "application.launcher",
+    "application.query"
+  ]
 }

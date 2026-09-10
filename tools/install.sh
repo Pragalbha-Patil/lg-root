@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# Upload an allowlisted build to an already registered rooted webOS installation.
+# Package and install Minimal Home on a rooted webOS TV over SSH.
 set -eu
 
 fail() {
@@ -16,8 +16,7 @@ for arg in "$@"; do
         --help|-h)
             echo "usage: sh tools/install.sh [--check] [--no-build]"
             echo "env: TV_HOST (SSH alias or hostname), TV_USER (default root), PYTHON (default python)"
-            echo "Preserves installed config, uploads files, and requests launch."
-            echo "Does not register Luna services or install boot hooks."
+            echo "Builds and installs the app/service IPK, preserves config, installs the watcher hook, and launches."
             exit 0
             ;;
         *) fail "unknown option: $arg" ;;
@@ -38,15 +37,15 @@ esac
 [ "${SVC_ID:-org.minimal.home.service}" = org.minimal.home.service ] || fail "SVC_ID overrides are unsupported"
 APP_DIR=/media/developer/apps/usr/palm/applications/org.minimal.home
 SVC_DIR=/media/developer/apps/usr/palm/services/org.minimal.home.service
+ELEVATE=/media/developer/apps/usr/palm/services/org.webosbrew.hbchannel.service/elevate-service
 REMOTE=${TV_USER}@${TV_HOST}
 
 command -v ssh >/dev/null 2>&1 || fail "ssh is required"
 if [ "$MODE" = check ]; then
-    echo "Checking target directories on $TV_HOST"
-    # Paths are fixed local constants; expand them before sending the command.
+    echo "Checking install prerequisites on $TV_HOST"
     # shellcheck disable=SC2029
-    ssh "$REMOTE" "test -d '$APP_DIR' && test -d '$SVC_DIR'"
-    echo "Target directories exist (service registration is not checked)."
+    ssh "$REMOTE" "test \"\$(id -u)\" = 0 && command -v luna-send-pub >/dev/null && command -v node >/dev/null && command -v setsid >/dev/null && test -x '$ELEVATE'"
+    echo "Root SSH, Luna installer access, Node.js, and Homebrew service elevation are available."
     exit 0
 fi
 command -v scp >/dev/null 2>&1 || fail "scp is required"
@@ -72,6 +71,9 @@ else
     cp -R launcher-app launcher-service "$STAGE_DIR/"
 fi
 
+MAKE_IPK=$SCRIPT_DIR/make_ipk.py
+[ -f "$MAKE_IPK" ] || fail "tools/make_ipk.py is missing"
+
 # Fetch the installed config before changing any TV files. An empty result means
 # this is a first install. A malformed config aborts before upload; otherwise its
 # custom values are merged over the new schema while the release version wins.
@@ -90,22 +92,53 @@ if [ -s "$FETCHED_CONFIG" ]; then
     cp "$MERGED_CONFIG" "$STAGE_DIR/launcher-service/config.json"
     echo "Preserved installed Minimal Home configuration."
 fi
-# Paths are fixed local constants; expand them before sending the command.
+IPK=$STAGE_DIR/org.minimal.home.ipk
+"$PYTHON" "$MAKE_IPK" "$STAGE_DIR" "$IPK"
+REMOTE_IPK=/tmp/org.minimal.home.ipk
+REMOTE_STATE=/tmp/org.minimal.home-install-state
+# App installation may replace whole package-owned directories. Save bounded
+# runtime state outside them and restore it after the package transaction.
 # shellcheck disable=SC2029
-ssh "$REMOTE" "mkdir -p '$APP_DIR' '$SVC_DIR'"
-scp -r "$STAGE_DIR/launcher-app/." "$REMOTE:$APP_DIR/"
-scp -r "$STAGE_DIR/launcher-service/." "$REMOTE:$SVC_DIR/"
-# Recursive SCP can reapply the staged directory mode to an existing target, so
-# restore the jailer's runtime-write access only after both uploads complete.
+ssh "$REMOTE" "rm -rf '$REMOTE_STATE'; mkdir -p '$REMOTE_STATE/service' '$REMOTE_STATE/app'; for name in usage.json prefs.json .noredirect; do if test -f '$SVC_DIR/'\"\$name\"; then cp -p '$SVC_DIR/'\"\$name\" '$REMOTE_STATE/service/'; fi; done; if test -d '$APP_DIR/icons'; then cp -Rp '$APP_DIR/icons' '$REMOTE_STATE/app/'; fi"
+scp "$IPK" "$REMOTE:$REMOTE_IPK"
+
+# An open webview can start the freshly installed relay before Homebrew has
+# applied its Luna permissions, leaving that process with the old identity.
+# Close our app before the package transaction; absence is harmless on a first
+# install and a fresh webview is launched after elevation below.
 # shellcheck disable=SC2029
-ssh "$REMOTE" "chmod 1777 '$SVC_DIR'"
+ssh "$REMOTE" "luna-send-pub -n 1 luna://com.webos.applicationManager/close '{\"id\":\"org.minimal.home\"}' >/dev/null 2>&1 || true"
+
+echo "Installing Minimal Home app and service"
+# The install API streams progress. awk exits successfully only after the
+# terminal installed state, and fails on an explicit rejection or timeout.
+# shellcheck disable=SC2029
+INSTALL_RESPONSE=$(ssh "$REMOTE" "luna-send-pub -w 90000 -i 'luna://com.webos.appInstallService/dev/install' '{\"id\":\"com.ares.defaultName\",\"ipkUrl\":\"$REMOTE_IPK\",\"subscribe\":true}' | awk '/\"state\"[[:space:]]*:[[:space:]]*\"installed\"/{print; ok=1; exit} /\"returnValue\"[[:space:]]*:[[:space:]]*false|\"state\"[[:space:]]*:[[:space:]]*\"[^\"]*failed[^\"]*\"/{print; exit 1} END {if (!ok) exit 1}'")
+printf '%s\n' "$INSTALL_RESPONSE"
+
+echo "Applying Homebrew Luna permissions to the relay"
+# Homebrew elevation supplies the legacy TV permissions that app manifests alone
+# do not install consistently. It also refreshes Luna's service configuration.
+# shellcheck disable=SC2029
+ssh "$REMOTE" "'$ELEVATE' org.minimal.home.service"
+
+# elevate-service rescans Luna metadata but does not stop an already-running
+# relay. Terminate only this exact service process so the post-install launch
+# starts it with the refreshed permissions.
+# shellcheck disable=SC2029
+ssh "$REMOTE" "relay=\$(ps -eo pid,args | awk '\$2 == \"org.minimal.home.service\" {print \$1; exit}'); if test -n \"\$relay\"; then kill \"\$relay\"; fi"
+
+echo "Installing and starting the watcher boot hook"
+# Stop only the old Minimal Home watcher so updated code is loaded, then install
+# the packaged idempotent hook and run it once for the current boot.
+# shellcheck disable=SC2029
+ssh "$REMOTE" "chmod 1777 '$SVC_DIR'; for name in usage.json prefs.json .noredirect; do source='$REMOTE_STATE/service/'\"\$name\"; target='$SVC_DIR/'\"\$name\"; if test -f \"\$source\"; then cp -p \"\$source\" \"\$target\" || cmp -s \"\$source\" \"\$target\"; fi; done; if test -d '$REMOTE_STATE/app/icons'; then mkdir -p '$APP_DIR/icons'; cp -Rp '$REMOTE_STATE/app/icons/.' '$APP_DIR/icons/'; fi; rm -rf '$REMOTE_STATE'; rm -f '$REMOTE_IPK'; mkdir -p /var/lib/webosbrew/init.d; cp '$SVC_DIR/start-watcher.sh' /var/lib/webosbrew/init.d/50-minimal-home; chmod 755 /var/lib/webosbrew/init.d/50-minimal-home; watcher=\$(ps -eo pid,args | awk '\$2 == \"node\" && \$3 == \"$SVC_DIR/watcher.js\" {print \$1; exit}'); if test -n \"\$watcher\"; then kill \"\$watcher\"; fi; /var/lib/webosbrew/init.d/50-minimal-home; count=0; while test \"\$count\" -lt 20 && ! test -s '$APP_DIR/icons/com.palm.app.settings.png'; do sleep 1; count=\$((count + 1)); done"
+
 echo "Requesting launch of Minimal Home"
-# Some rooted webOS builds give boot-hook processes the Luna preload environment
-# but omit it from root SSH sessions. Reuse the running watcher's bounded
-# environment when available, with the ordinary SSH-session call as a fallback.
-# Paths and the payload are fixed local constants expanded before transmission.
+# Root SSH lacks Luna preload variables on some TVs. Reuse the environment of
+# the watcher we just confirmed or started, with the public client as fallback.
 # shellcheck disable=SC2029
-RESPONSE=$(ssh "$REMOTE" "watcher=\$(ps -eo pid,args | awk '\$2 == \"node\" && \$3 == \"$SVC_DIR/watcher.js\" {print \$1; exit}'); if test -n \"\$watcher\" && test -r \"/proc/\$watcher/environ\"; then xargs -0 env < \"/proc/\$watcher/environ\" luna-send -n 1 luna://com.webos.applicationManager/launch '{\"id\":\"org.minimal.home\"}'; else luna-send -n 1 luna://com.webos.applicationManager/launch '{\"id\":\"org.minimal.home\"}'; fi")
+RESPONSE=$(ssh "$REMOTE" "watcher=\$(ps -eo pid,args | awk '\$2 == \"node\" && \$3 == \"$SVC_DIR/watcher.js\" {print \$1; exit}'); if test -n \"\$watcher\" && test -r \"/proc/\$watcher/environ\"; then xargs -0 env < \"/proc/\$watcher/environ\" luna-send -n 1 luna://com.webos.applicationManager/launch '{\"id\":\"org.minimal.home\"}'; else luna-send-pub -n 1 luna://com.webos.applicationManager/launch '{\"id\":\"org.minimal.home\"}'; fi")
 printf '%s\n' "$RESPONSE"
 printf '%s\n' "$RESPONSE" | "$PYTHON" -c 'import json,sys; sys.exit(0 if json.load(sys.stdin).get("returnValue") is True else 1)'
-echo "Upload and launch request succeeded. Running webviews/services may still need restarting; see docs/INSTALL.md."
+echo "Minimal Home app, service, and watcher installed successfully."

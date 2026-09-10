@@ -11,6 +11,12 @@ import shutil
 import subprocess
 import sys
 import tarfile
+import tempfile
+
+try:
+    from tools import make_ipk
+except ModuleNotFoundError:  # Direct execution adds tools/, not the repository root.
+    import make_ipk
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNTIME_FILES = (
@@ -26,12 +32,14 @@ RUNTIME_FILES = (
     "launcher-service/package.json",
     "launcher-service/service.js",
     "launcher-service/services.json",
+    "launcher-service/start-watcher.sh",
     "launcher-service/watcher.js",
 )
 RELEASE_FILES = RUNTIME_FILES + (
     "LICENSE",
     "docs/INSTALL.md",
     "tools/install.sh",
+    "tools/make_ipk.py",
     "tools/merge_config.py",
 )
 
@@ -55,6 +63,10 @@ def package(destination, root=ROOT):
                     entry.size = len(data)
                     entry.mode = 0o755 if name == "tools/install.sh" else 0o644
                     archive.addfile(entry, io.BytesIO(data))
+    write_checksum(destination)
+
+
+def write_checksum(destination):
     digest = hashlib.sha256(destination.read_bytes()).hexdigest()
     destination.with_name(destination.name + ".sha256").write_text(
         "%s  %s\n" % (digest, destination.name), encoding="utf-8", newline="\n"
@@ -85,7 +97,13 @@ def main(argv=None):
             args.output_dir.mkdir(parents=True, exist_ok=True)
             destination = args.output_dir / ("minimal-home-v%s.tar.gz" % version)
             package(destination)
-            print("Packaged %s (SHA-256 sidecar written)" % destination)
+            with tempfile.TemporaryDirectory() as temp:
+                staged = Path(temp)
+                stage(staged)
+                ipk = args.output_dir / ("org.minimal.home_%s_all.ipk" % version)
+                make_ipk.build(staged, ipk)
+                write_checksum(ipk)
+            print("Packaged %s and %s (SHA-256 sidecars written)" % (destination, ipk))
     except (OSError, ValueError, KeyError, subprocess.SubprocessError) as exc:
         parser.exit(1, "error: %s\n" % exc)
     return 0

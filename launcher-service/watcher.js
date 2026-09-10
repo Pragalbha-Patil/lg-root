@@ -393,7 +393,9 @@ function watch() {
     });
 }
 
-setTimeout(runProvision, 15000);
+// Schedule immediately so a first install has icons before its webview loads.
+// A zero-delay timer lets the foreground subscription initialize first.
+setTimeout(runProvision, 0);
 setInterval(runProvision, 5 * 60 * 1000);
 
 // System stats collection every 5s (watcher runs as root, can read /sys/class/thermal)
