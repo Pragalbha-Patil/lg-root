@@ -467,6 +467,38 @@ test('relaunch refreshes live tiles and a background event cannot consume the fo
     assert.equal(app.calls.filter(c => c.method === 'getTiles').length, before + 2);
 });
 
+test('foreground refresh during in-flight discovery runs one trailing refresh', async t => {
+    const app = appFor(t);
+    const stale = { id: 'stale', title: 'Stale' };
+    assert.equal(app.calls.filter(c => c.method === 'getTiles').length, 1);
+    app.visible(false); app.visible(true);
+    await app.clock.run(400);
+    app.tiles({ tiles: [stale], inputs: [] });
+    assert.equal(app.calls.filter(c => c.method === 'getTiles').length, 2);
+    app.tiles({ tiles: [video], inputs: [port] });
+    assert.deepEqual(ids(app, 'grid'), ['video']);
+    assert.equal(app.calls.filter(c => c.method === 'getTiles').length, 2);
+});
+
+test('failed discovery with a pending foreground refresh retries immediately', async t => {
+    const app = appFor(t);
+    app.visible(false); app.visible(true);
+    await app.clock.run(400);
+    app.tiles({ returnValue: false });
+    assert.equal(app.calls.filter(c => c.method === 'getTiles').length, 2);
+    app.tiles({ tiles: [video], inputs: [port] });
+    assert.deepEqual(ids(app, 'grid'), ['video']);
+});
+
+test('empty runtime header strings fall back to the configured default', t => {
+    const app = appFor(t);
+    app.tiles({ tiles: [], inputs: [], prefs: {}, header: { text: '', brand: '' } });
+    assert.equal(app.document.querySelector('#headText').textContent, '');
+    assert.equal(app.document.querySelector('#headBrand').textContent, 'Minimal Home');
+    assert.equal(app.document.title, 'Minimal Home');
+    assert.equal(app.document.querySelector('#brandPanel.show'), null);
+});
+
 test('changed discovery does not steal focus from an open settings panel', t => {
     const app = appFor(t); ready(app); app.click('#settingsBtn');
     const focused = app.document.activeElement;
