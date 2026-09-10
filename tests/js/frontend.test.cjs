@@ -407,6 +407,69 @@ test('search launches input parameters; double taps and stale launch completions
     await app.clock.run(0); assert.match(app.document.querySelector('#err').textContent, /offline/);
 });
 
+test('move reorders pinned apps and saves on OK', t => {
+    const alpha = { id: 'alpha', title: 'Alpha', icon: 'icons/alpha.png' };
+    const app = appFor(t);
+    ready(app, { tiles: [video, alpha], prefs: { pinned: ['video', 'alpha'] } });
+    assert.deepEqual(ids(app, 'grid').slice(0, 2), ['video', 'alpha']);
+    app.document.querySelector('#grid [data-id="video"]').focus(); app.key(457);
+    const rows = [...app.document.querySelectorAll('#optionsRows .optrow')].map(r => r.textContent);
+    assert.ok(rows.includes('Move'));
+    app.click('#optionsRows .optrow:nth-child(3)');
+    assert.equal(app.document.querySelector('#moveHint').style.display, 'block');
+    let moved = app.document.querySelector('#grid [data-id="video"]');
+    assert.equal(app.document.activeElement, moved);
+    assert.ok(moved.classList.contains('moving'));
+    app.key(37); app.key(37, 'keyup');
+    assert.deepEqual(ids(app, 'grid').slice(0, 2), ['video', 'alpha']);
+    app.key(39); app.key(39, 'keyup');
+    assert.deepEqual(ids(app, 'grid').slice(0, 2), ['alpha', 'video']);
+    assert.equal(app.calls.filter(c => c.method === 'setPrefs').length, 0);
+    assert.equal(app.document.activeElement.getAttribute('data-id'), 'video');
+    app.key(39); app.key(39, 'keyup');
+    assert.deepEqual(ids(app, 'grid').slice(0, 2), ['alpha', 'video']);
+    app.key(13); app.key(13, 'keyup');
+    const call = app.calls.find(c => c.method === 'setPrefs' && !c.answered);
+    assert.deepEqual([...call.parameters.pinned], ['alpha', 'video']);
+    save(app);
+    assert.equal(app.document.querySelector('#moveHint').style.display, 'none');
+    assert.deepEqual(ids(app, 'grid').slice(0, 2), ['alpha', 'video']);
+    assert.equal(app.document.activeElement.getAttribute('data-id'), 'video');
+});
+
+test('back cancels a pin move without saving', t => {
+    const alpha = { id: 'alpha', title: 'Alpha', icon: 'icons/alpha.png' };
+    const app = appFor(t);
+    ready(app, { tiles: [video, alpha], prefs: { pinned: ['video', 'alpha'] } });
+    app.document.querySelector('#grid [data-id="video"]').focus(); app.key(457);
+    app.click('#optionsRows .optrow:nth-child(3)');
+    app.key(39); app.key(39, 'keyup');
+    assert.deepEqual(ids(app, 'grid').slice(0, 2), ['alpha', 'video']);
+    app.key(461);
+    assert.deepEqual(ids(app, 'grid').slice(0, 2), ['video', 'alpha']);
+    assert.equal(app.calls.filter(c => c.method === 'setPrefs').length, 0);
+    assert.equal(app.document.querySelector('#moveHint').style.display, 'none');
+    assert.equal(app.document.querySelector('#optionsPanel.show'), null);
+    assert.equal(app.document.activeElement.getAttribute('data-id'), 'video');
+});
+
+test('move is hidden for single pins, unpinned tiles, and alphabetical sort', t => {
+    const alpha = { id: 'alpha', title: 'Alpha', icon: 'icons/alpha.png' };
+    const labels = () => [...app.document.querySelectorAll('#optionsRows .optrow')].map(r => r.textContent);
+    const app = appFor(t);
+    ready(app, { tiles: [video, alpha], prefs: { pinned: ['video'] } });
+    app.document.querySelector('#grid [data-id="video"]').focus(); app.key(457);
+    assert.ok(!labels().includes('Move'));
+    app.key(461);
+    app.document.querySelector('#grid [data-id="alpha"]').focus(); app.key(457);
+    assert.ok(!labels().includes('Move'));
+    app.key(461);
+    const ordered = appFor(t);
+    ready(ordered, { tiles: [video, alpha], prefs: { pinned: ['video', 'alpha'], sort: 'alpha' } });
+    ordered.document.querySelector('#grid [data-id="video"]').focus(); ordered.key(457);
+    assert.ok(![...ordered.document.querySelectorAll('#optionsRows .optrow')].map(r => r.textContent).includes('Move'));
+});
+
 test('search opens from the header button and launches with remote only', t => {
     const app = appFor(t); ready(app, { tiles: [video], inputs: [port] });
     app.click('#searchBtn');

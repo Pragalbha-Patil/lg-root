@@ -834,6 +834,8 @@
     document.getElementById("settingsPanel").classList.remove("show");
     document.getElementById("brandPanel").classList.remove("show");
     document.getElementById("confirmPanel").classList.remove("show");
+    document.getElementById("moveHint").style.display = "none";
+    moveState = null;
     document.getElementById("optionsPanel").classList.remove("show");
     document.getElementById("searchBox").classList.remove("show");
     overlay.mode = null;
@@ -952,6 +954,8 @@
     var pinned = PREFS.pinned.indexOf(id) >= 0;
     var rows = ["Pin", "Hide app", "Launch", "Close"];
     if (pinned) rows[0] = "Unpin";
+    if (pinned && PREFS.sort !== "alpha" && sectionPinnedIds(id).length > 1)
+      rows.splice(2, 0, "Move");
     document.getElementById("optionsRows").innerHTML = rows
       .map(function (l) {
         return (
@@ -1020,6 +1024,69 @@
     commitPrefs(function () {
       refresh();
     });
+  }
+  function sectionPinnedIds(id) {
+    var el = tile4(id);
+    if (!el || !el.parentNode) return [];
+    var found = [];
+    var tiles = el.parentNode.querySelectorAll(".tile.pinned");
+    for (var i = 0; i < tiles.length; i++)
+      found.push(tiles[i].getAttribute("data-id"));
+    return found;
+  }
+  function swapPinned(first, second) {
+    var order = PREFS.pinned.slice();
+    var a = order.indexOf(first);
+    var b = order.indexOf(second);
+    if (a < 0 || b < 0) return;
+    order[a] = second;
+    order[b] = first;
+    PREFS.pinned = order;
+  }
+  var moveState = null;
+  function markMovedTile() {
+    var el = moveState && tile4(moveState.id);
+    if (!el) return;
+    el.focus();
+    el.classList.add("moving");
+  }
+  function openMove(id) {
+    moveState = { id: id, snapshot: PREFS.pinned.slice() };
+    document.getElementById("optionsPanel").classList.remove("show");
+    document.getElementById("moveHint").style.display = "block";
+    overlay.mode = "move";
+    markMovedTile();
+  }
+  function moveStep(dir) {
+    if (!moveState) return;
+    var neighbors = sectionPinnedIds(moveState.id);
+    var at = neighbors.indexOf(moveState.id);
+    var other = dir === "left" ? neighbors[at - 1] : neighbors[at + 1];
+    if (at < 0 || !other) return;
+    swapPinned(moveState.id, other);
+    rebuild(__mhTiles, __mhInputs);
+    markMovedTile();
+  }
+  function moveDirKey(dir) {
+    if (dir === "left" || dir === "right") moveStep(dir);
+    return true;
+  }
+  function closeMove(save) {
+    var id = moveState ? moveState.id : null;
+    if (!save && moveState) PREFS.pinned = moveState.snapshot;
+    if (save)
+      commitPrefs(function () {
+        refresh();
+      });
+    moveState = null;
+    document.getElementById("moveHint").style.display = "none";
+    rebuild(__mhTiles, __mhInputs);
+    var el = id && tile4(id);
+    if (el) {
+      el.focus();
+      lastFocusEl = el;
+    }
+    hideOverlay();
   }
   function launchSearchRow(id) {
     hideOverlay();
@@ -1128,12 +1195,16 @@
     var label = el.querySelector(".sl")
       ? el.querySelector(".sl").textContent
       : "";
+    var id = el.getAttribute("data-id");
     if (label === "Close") {
       hideOverlay();
       return;
     }
+    if (label === "Move") {
+      if (id) openMove(id);
+      return;
+    }
     hideOverlay();
-    var id = el.getAttribute("data-id");
     if (!id) return;
     if (label === "Pin" || label === "Unpin") togglePin(id);
     else if (label === "Hide app") hideApp(id);
@@ -1196,6 +1267,10 @@
       closeConfirmReset(false);
       return true;
     }
+    if (overlay.mode === "move") {
+      closeMove(false);
+      return true;
+    }
     hideOverlay();
     return true;
   }
@@ -1241,6 +1316,7 @@
       moveFocusIn("#confirmPanel .srow", dir);
       return true;
     }
+    if (overlay.mode === "move") return moveDirKey(dir);
     var selectors = {
       options: "#optionsRows .optrow",
       manage: "#optionsRows .optrow, #optionsRows .srow"
@@ -1260,6 +1336,10 @@
         (overlay.mode === "search" && document.activeElement === searchInput())
       )
         return false;
+      if (overlay.mode === "move") {
+        closeMove(true);
+        return true;
+      }
       e.preventDefault();
       var el = document.activeElement;
       activateRow(el);
