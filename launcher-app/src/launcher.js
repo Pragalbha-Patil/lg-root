@@ -1022,13 +1022,17 @@
     launchFromId(id);
   }
   var searchQ = "";
+  function searchInput() {
+    return document.getElementById("searchInput");
+  }
   function openSearch(ch) {
     lastFocusEl = document.activeElement;
     overlay.mode = "search";
     searchQ = ch || "";
     renderSearch();
     showOverlay("searchBox");
-    focusFirst("#searchRows .srow");
+    searchInput().value = searchQ;
+    searchInput().focus();
   }
   function searchMatches() {
     var q = searchQ.toLowerCase();
@@ -1045,27 +1049,32 @@
     return starts.concat(cont).slice(0, 8);
   }
   function renderSearch() {
-    document.getElementById("searchQ").textContent = searchQ
-      ? "“" + searchQ + "”"
-      : "“”";
+    var input = searchInput();
+    if (document.activeElement !== input) input.value = searchQ;
     var list = searchMatches();
-    var html = list.length
-      ? list
-          .map(function (t) {
-            return (
-              '<div class="srow" tabindex="0" data-id="' +
-              esc(t.id) +
-              '"><span class="sl">' +
-              esc(t.title || t.id) +
-              '</span><span class="small">' +
-              esc(t.id) +
-              "</span></div>"
-            );
-          })
-          .join("")
-      : '<div class="srow" tabindex="0" data-key="none"><span class="sl">No matches</span></div>';
+    var html;
+    if (!searchQ) {
+      html =
+        '<div class="srow" tabindex="0" data-key="none"><span class="sl">Type to search installed apps</span></div>';
+    } else if (list.length) {
+      html = list
+        .map(function (t) {
+          return (
+            '<div class="srow" tabindex="0" data-id="' +
+            esc(t.id) +
+            '"><span class="sl">' +
+            esc(t.title || t.id) +
+            '</span><span class="small">' +
+            esc(t.id) +
+            "</span></div>"
+          );
+        })
+        .join("");
+    } else {
+      html =
+        '<div class="srow" tabindex="0" data-key="none"><span class="sl">No matches</span></div>';
+    }
     document.getElementById("searchRows").innerHTML = html;
-    focusFirst("#searchRows .srow");
   }
   function activateBrandRow(el) {
     var key = el.getAttribute("data-key");
@@ -1158,12 +1167,26 @@
       return false;
     return true;
   }
-  function overlayBackKey(kc) {
-    if (kc === 8 && overlay.mode === "search" && searchQ) {
-      searchQ = searchQ.slice(0, -1);
-      renderSearch();
+  function searchBackKey(kc) {
+    // While the field is focused the on-screen keyboard owns editing: Back
+    // dismisses it by leaving the field, and only a later Back closes search.
+    if (document.activeElement === searchInput()) {
+      if (kc === 8) return false;
+      searchInput().blur();
+      focusFirst("#searchRows .srow");
       return true;
     }
+    if (kc === 8 && searchQ) {
+      searchQ = searchQ.slice(0, -1);
+      renderSearch();
+      focusFirst("#searchRows .srow");
+      return true;
+    }
+    hideOverlay();
+    return true;
+  }
+  function overlayBackKey(kc) {
+    if (overlay.mode === "search") return searchBackKey(kc);
     if (overlay.mode === "brand") return brandBackKey();
     if (overlay.mode === "confirm") {
       closeConfirmReset(false);
@@ -1197,17 +1220,26 @@
     changeSetting(row.getAttribute("data-key"), dir === "left" ? -1 : 1);
     return true;
   }
+  function searchDirKey(dir) {
+    if (
+      document.activeElement === searchInput() &&
+      (dir === "left" || dir === "right")
+    )
+      return false;
+    moveFocusIn("#searchInput, #searchRows .srow", dir);
+    return true;
+  }
   function overlayDirKey(dir) {
     if (overlay.mode === "brand") return brandDirKey(dir);
     if (overlay.mode === "settings") return settingsDirKey(dir);
+    if (overlay.mode === "search") return searchDirKey(dir);
     if (overlay.mode === "confirm") {
       moveFocusIn("#confirmPanel .srow", dir);
       return true;
     }
     var selectors = {
       options: "#optionsRows .optrow",
-      manage: "#optionsRows .optrow, #optionsRows .srow",
-      search: "#searchRows .srow"
+      manage: "#optionsRows .optrow, #optionsRows .srow"
     };
     moveFocusIn(selectors[overlay.mode], dir);
     return true;
@@ -1219,8 +1251,9 @@
     if (dir) return overlayDirKey(dir);
     if (kc === 13) {
       if (
-        overlay.mode === "brand" &&
-        document.activeElement === document.getElementById("brandInput")
+        (overlay.mode === "brand" &&
+          document.activeElement === document.getElementById("brandInput")) ||
+        (overlay.mode === "search" && document.activeElement === searchInput())
       )
         return false;
       e.preventDefault();
@@ -1229,6 +1262,7 @@
       return true;
     }
     if (overlay.mode === "search") {
+      if (document.activeElement === searchInput()) return false;
       if (
         e.key &&
         e.key.length === 1 &&
@@ -1239,6 +1273,7 @@
       ) {
         searchQ += e.key;
         renderSearch();
+        focusFirst("#searchRows .srow");
         return true;
       }
     }
@@ -1396,6 +1431,10 @@
       openSettingsPanel();
       return;
     }
+    if (el0.id === "searchBtn") {
+      openSearch("");
+      return;
+    }
     if (el0.className && (" " + el0.className + " ").indexOf(" tile ") >= 0)
       doLaunch(el0);
   }
@@ -1410,7 +1449,8 @@
       if (
         el0 &&
         el0.className &&
-        (" " + el0.className + " ").indexOf(" tile ") >= 0
+        (" " + el0.className + " ").indexOf(" tile ") >= 0 &&
+        el0.getAttribute("data-id")
       )
         openOptions(el0);
     }, 700);
@@ -1420,7 +1460,8 @@
     if (
       el0 &&
       el0.className &&
-      (" " + el0.className + " ").indexOf(" tile ") >= 0
+      (" " + el0.className + " ").indexOf(" tile ") >= 0 &&
+      el0.getAttribute("data-id")
     )
       openOptions(el0);
   }
@@ -1486,6 +1527,13 @@
   var sb = document.getElementById("settingsBtn");
   sb.addEventListener("click", function () {
     openSettingsPanel();
+  });
+  document.getElementById("searchBtn").addEventListener("click", function () {
+    openSearch("");
+  });
+  searchInput().addEventListener("input", function () {
+    searchQ = searchInput().value.slice(0, 100);
+    renderSearch();
   });
   document.getElementById("brandInput").addEventListener("input", function () {
     document.getElementById("brandError").textContent = "";
