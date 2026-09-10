@@ -454,6 +454,23 @@ test('typing from the result rows appends to the query', t => {
     assert.equal(app.document.activeElement, app.document.querySelector('#searchRows .srow'));
 });
 
+test('pin and unpin send the updated pinned list', t => {
+    const alpha = { id: 'alpha', title: 'Alpha', icon: 'icons/alpha.png' };
+    const app = appFor(t);
+    app.tiles({ tiles: [video, alpha], inputs: [], prefs: { pinned: ['video'] } });
+    app.document.querySelector('#grid [data-id="alpha"]').focus(); app.key(457);
+    app.click('#optionsRows .optrow:nth-child(1)');
+    let call = app.calls.find(c => c.method === 'setPrefs' && !c.answered);
+    assert.deepEqual([...call.parameters.pinned], ['video', 'alpha']);
+    save(app);
+    app.document.querySelector('#grid [data-id="alpha"]').focus(); app.key(457);
+    app.click('#optionsRows .optrow:nth-child(1)');
+    call = app.calls.find(c => c.method === 'setPrefs' && !c.answered);
+    assert.deepEqual([...call.parameters.pinned], ['video']);
+    save(app);
+    assert.ok(!app.document.querySelector('#grid [data-id="alpha"]').classList.contains('pinned'));
+});
+
 test('remote navigation, repeating arrows, focus restoration and overlays stay usable', async t => {
     const app = appFor(t); ready(app, { tiles: [video, { id: 'two', title: 'Two' }, { id: 'three', title: 'Three' }] });
     const tiles = [...app.document.querySelectorAll('.tile')];
