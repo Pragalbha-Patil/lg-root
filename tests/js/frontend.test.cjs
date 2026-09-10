@@ -433,6 +433,7 @@ test('move reorders pinned apps and saves on OK', t => {
     assert.deepEqual([...call.parameters.pinned], ['alpha', 'video']);
     save(app);
     assert.equal(app.document.querySelector('#moveHint').style.display, 'none');
+    assert.equal(app.document.querySelectorAll('#grid .tile.moving').length, 0);
     assert.deepEqual(ids(app, 'grid').slice(0, 2), ['alpha', 'video']);
     assert.equal(app.document.activeElement.getAttribute('data-id'), 'video');
 });
@@ -449,8 +450,21 @@ test('back cancels a pin move without saving', t => {
     assert.deepEqual(ids(app, 'grid').slice(0, 2), ['video', 'alpha']);
     assert.equal(app.calls.filter(c => c.method === 'setPrefs').length, 0);
     assert.equal(app.document.querySelector('#moveHint').style.display, 'none');
+    assert.equal(app.document.querySelectorAll('#grid .tile.moving').length, 0);
     assert.equal(app.document.querySelector('#optionsPanel.show'), null);
     assert.equal(app.document.activeElement.getAttribute('data-id'), 'video');
+});
+
+test('exiting move mode without changes clears the marker', t => {
+    const alpha = { id: 'alpha', title: 'Alpha', icon: 'icons/alpha.png' };
+    const app = appFor(t);
+    ready(app, { tiles: [video, alpha], prefs: { pinned: ['video', 'alpha'] } });
+    app.document.querySelector('#grid [data-id="video"]').focus(); app.key(457);
+    app.click('#optionsRows .optrow:nth-child(3)');
+    assert.ok(app.document.querySelector('#grid .tile.moving'));
+    app.key(13); app.key(13, 'keyup');
+    assert.equal(app.document.querySelectorAll('#grid .tile.moving').length, 0);
+    assert.equal(app.document.querySelector('#moveHint').style.display, 'none');
 });
 
 test('move is hidden for single pins, unpinned tiles, and alphabetical sort', t => {

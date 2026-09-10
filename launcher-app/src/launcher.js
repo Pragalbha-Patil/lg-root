@@ -1071,6 +1071,14 @@
     if (dir === "left" || dir === "right") moveStep(dir);
     return true;
   }
+  function unmarkMovedTiles() {
+    Array.prototype.forEach.call(
+      document.querySelectorAll(".tile.moving"),
+      function (t) {
+        t.classList.remove("moving");
+      }
+    );
+  }
   function closeMove(save) {
     var id = moveState ? moveState.id : null;
     if (!save && moveState) PREFS.pinned = moveState.snapshot;
@@ -1080,6 +1088,7 @@
       });
     moveState = null;
     document.getElementById("moveHint").style.display = "none";
+    unmarkMovedTiles();
     rebuild(__mhTiles, __mhInputs);
     var el = id && tile4(id);
     if (el) {
