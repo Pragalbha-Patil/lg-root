@@ -39,6 +39,20 @@ __SYS__
   <div id="settingsRows" class="rowset"></div>
   <div class="settings-hint">&#8593; &#8595; Navigate &nbsp; &#183; &nbsp; &#8592; &#8594; Change &nbsp; &#183; &nbsp; OK Select &nbsp; &#183; &nbsp; BACK Close</div>
 </div>
+<div id="brandPanel" class="panel brand-panel" role="dialog" aria-modal="true" aria-labelledby="brandTitle">
+  <div class="panel-head" id="brandTitle">Choose your launcher name <small>Header brand</small></div>
+  <p class="brand-help">This name appears in bold after <b>WELCOME</b> in the upper-left header. Select the field with your TV remote to use the on-screen keyboard.</p>
+  <div class="brand-preview"><span>WELCOME</span> <b id="brandPreview">Minimal Home</b></div>
+  <label for="brandInput">Brand name</label>
+  <input id="brandInput" type="text" maxlength="40" autocomplete="off" aria-describedby="brandHelpText">
+  <div id="brandHelpText" class="brand-input-hint">Up to 40 characters. You can change it later in Settings.</div>
+  <div id="brandError" class="brand-error" role="alert"></div>
+  <div class="brand-actions">
+    <div class="srow" tabindex="0" data-key="brand-save"><span class="sl">Save name</span><span class="val">OK</span></div>
+    <div class="srow" tabindex="0" data-key="brand-cancel"><span class="sl" id="brandCancelLabel">Keep Minimal Home</span></div>
+  </div>
+  <div class="settings-hint">&#8593; &#8595; Navigate &nbsp; &#183; &nbsp; OK Select</div>
+</div>
 <div id="optionsPanel" class="panel opt">
   <div class="panel-head">Options</div>
   <div id="optionsRows" class="rowset"></div>

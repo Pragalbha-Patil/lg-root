@@ -29,6 +29,12 @@ Missing fields inherit defaults. Invalid JSON, wrong field types, and invalid
 version strings fail the build. The committed startup banner remains generic;
 the live relay supplies the configured greeting.
 
+When the live `header.brand` is still the default `Minimal Home`, a first-run
+dialog explains that the brand is the bold name after `WELCOME` in the upper-left
+header. Select its text field with the TV remote to use the webOS on-screen
+keyboard. Saving or keeping the default records setup in TV preferences, so an
+update does not ask again. A non-default configured brand skips the dialog.
+
 Inputs are discovered from the TV's launch points. Do not add a fixed HDMI list
 to config. The system allowlist is explicit: an empty list hides all system
 apps, including the Settings tile. The header gear still opens launcher preferences,
@@ -74,8 +80,10 @@ they can leave the greeting blank or system apps hidden until corrected.
 Open the Settings tile or header gear. Left/Right cycles options; OK activates a
 row; Back closes the panel.
 
-Preferences include accent color, tile size, labels, clock options, date format,
-sort mode, and system statistics. Use the per-tile menu to pin/unpin or hide an app;
+Preferences include the header brand name, accent color, tile size, labels, clock
+options, date format, sort mode, and system statistics. A brand saved through the
+launcher takes precedence over `header.brand` and can be edited again from the
+Brand name row. Use the per-tile menu to pin/unpin or hide an app;
 restore hidden apps from Settings. App labels affects tile captions only, not
 CPU/RAM/temperature captions; tiles retain accessible names when captions are hidden.
 Reset all restores defaults.

@@ -138,6 +138,10 @@
   var tilesLoaded = false;
   var renderedTiles = "";
   var PREFS = M.preferences();
+  var DEFAULT_BRAND = "Minimal Home";
+  var configuredHeader = { text: "Welcome", brand: DEFAULT_BRAND };
+  var headerLoaded = false;
+  var brandFirstRun = false;
   var clockTimer = null,
     clockHTML = "";
   var prefsRevision = 0;
@@ -307,6 +311,7 @@
     var statsEl = document.getElementById("sysStats");
     if (statsEl)
       statsEl.style.display = PREFS.showSystemStats ? "flex" : "none";
+    applyBrand();
     tick();
   }
   function persistFocus() {
@@ -511,6 +516,15 @@
   }
 
   var SETTING_ROWS = [
+    {
+      key: "brand",
+      group: "Header",
+      label: "Brand name",
+      type: "action",
+      fmt: function () {
+        return effectiveBrand();
+      }
+    },
     {
       key: "tvsettings",
       group: "TV",
@@ -775,6 +789,7 @@
   function hideOverlay() {
     document.getElementById("dim").classList.remove("show");
     document.getElementById("settingsPanel").classList.remove("show");
+    document.getElementById("brandPanel").classList.remove("show");
     document.getElementById("optionsPanel").classList.remove("show");
     document.getElementById("searchBox").classList.remove("show");
     overlay.mode = null;
@@ -798,6 +813,75 @@
     renderSettings();
     showOverlay("settingsPanel");
     focusFirst("#settingsRows .srow");
+  }
+  function effectiveBrand() {
+    return M.brand(PREFS.brand) || configuredHeader.brand || DEFAULT_BRAND;
+  }
+  function applyBrand() {
+    var name = effectiveBrand();
+    document.getElementById("headBrand").textContent = name;
+    document.title = name;
+  }
+  function updateBrandPreview() {
+    var value = M.brand(document.getElementById("brandInput").value);
+    document.getElementById("brandPreview").textContent =
+      value || effectiveBrand();
+  }
+  function openBrandEditor(firstRun) {
+    if (firstRun) lastFocusEl = document.activeElement;
+    else document.getElementById("settingsPanel").classList.remove("show");
+    brandFirstRun = !!firstRun;
+    document.getElementById("brandInput").value = effectiveBrand();
+    document.getElementById("brandError").textContent = "";
+    document.getElementById("brandCancelLabel").textContent = firstRun
+      ? "Keep " + DEFAULT_BRAND
+      : "Cancel";
+    updateBrandPreview();
+    overlay.mode = "brand";
+    showOverlay("brandPanel");
+    focusFirst("#brandInput");
+  }
+  function closeBrandEditor(save) {
+    var firstRun = brandFirstRun;
+    var changed = false;
+    if (save) {
+      var name = M.brand(document.getElementById("brandInput").value);
+      if (!name) {
+        document.getElementById("brandError").textContent =
+          "Enter a name from 1 to 40 characters.";
+        focusFirst("#brandInput");
+        return;
+      }
+      PREFS.brand = name;
+      PREFS.brandConfigured = true;
+      changed = true;
+    } else if (firstRun && !PREFS.brandConfigured) {
+      PREFS.brandConfigured = true;
+      changed = true;
+    }
+    brandFirstRun = false;
+    applyBrand();
+    document.getElementById("brandPanel").classList.remove("show");
+    if (firstRun) {
+      hideOverlay();
+    } else {
+      overlay.mode = "settings";
+      renderSettings();
+      document.getElementById("settingsPanel").classList.add("show");
+      focusRow("brand");
+    }
+    if (changed) commitPrefs();
+  }
+  function maybePromptBrand() {
+    if (
+      !headerLoaded ||
+      overlay.mode ||
+      PREFS.brandConfigured ||
+      M.brand(PREFS.brand) ||
+      configuredHeader.brand !== DEFAULT_BRAND
+    )
+      return;
+    openBrandEditor(true);
   }
   function openOptions(el) {
     lastFocusEl = el;
@@ -934,7 +1018,16 @@
     if (!el) return;
     var key = el.getAttribute("data-key");
     var id = el.getAttribute("data-id");
+    if (mode === "brand") {
+      if (key === "brand-save") closeBrandEditor(true);
+      else if (key === "brand-cancel") closeBrandEditor(false);
+      return;
+    }
     if (mode === "settings") {
+      if (key === "brand") {
+        openBrandEditor(false);
+        return;
+      }
       if (key === "tvsettings") {
         hideOverlay();
         if (SETTINGS_TILE) launch(SETTINGS_TILE.id, null);
@@ -1000,11 +1093,30 @@
         renderSearch();
         return true;
       }
+      if (overlay.mode === "brand") {
+        // The brand name is typed with the TV on-screen keyboard: Back and
+        // Backspace must reach the field (or dismiss the keyboard), never
+        // close the dialog and discard the typed name. The Save/Cancel rows
+        // dismiss the editor explicitly; elsewhere Back is swallowed so the
+        // webview never prompts to exit.
+        if (document.activeElement === document.getElementById("brandInput"))
+          return false;
+        return true;
+      }
       hideOverlay();
       return true;
     }
     var dir = dirOf(kc);
     if (dir) {
+      if (overlay.mode === "brand") {
+        if (
+          document.activeElement === document.getElementById("brandInput") &&
+          (dir === "left" || dir === "right")
+        )
+          return false;
+        moveFocusIn("#brandInput, #brandPanel .brand-actions .srow", dir);
+        return true;
+      }
       if (overlay.mode === "settings") {
         if (dir === "left" || dir === "right") {
           var row = document.activeElement;
@@ -1033,6 +1145,11 @@
       return true;
     }
     if (kc === 13) {
+      if (
+        overlay.mode === "brand" &&
+        document.activeElement === document.getElementById("brandInput")
+      )
+        return false;
       e.preventDefault();
       var el = document.activeElement;
       activateRow(el);
@@ -1297,6 +1414,10 @@
   sb.addEventListener("click", function () {
     openSettingsPanel();
   });
+  document.getElementById("brandInput").addEventListener("input", function () {
+    document.getElementById("brandError").textContent = "";
+    updateBrandPreview();
+  });
   Array.prototype.forEach.call(
     document.querySelectorAll("#grid .tile, #inputs .tile, #sysrow .tile"),
     function (el) {
@@ -1333,16 +1454,16 @@
     return document.hidden && !document.hasFocus();
   }
   function applyHeader(h) {
-    if (!h) return;
-    if (h.text) {
+    if (!M.record(h)) return;
+    if (typeof h.text === "string") {
+      configuredHeader.text = h.text;
       document.getElementById("headText").textContent = String(
         h.text
       ).toUpperCase();
     }
-    if (h.brand) {
-      document.getElementById("headBrand").textContent = String(h.brand);
-      document.title = String(h.brand);
-    }
+    if (typeof h.brand === "string") configuredHeader.brand = h.brand;
+    headerLoaded = true;
+    applyBrand();
   }
   function tilesFailed() {
     refreshing = false;
@@ -1404,6 +1525,7 @@
           if (M.record(d.prefs)) acceptPrefs(d.prefs, revision);
           else if (!prefsSaving && revision === prefsRevision) loadPrefs();
           rebuild(d.tiles, d.inputs);
+          maybePromptBrand();
         } else {
           tilesFailed();
         }

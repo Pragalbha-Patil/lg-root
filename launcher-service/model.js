@@ -14,7 +14,9 @@
         pinned: [],
         hidden: [],
         showSystemStats: true,
-        dateFormat: 'HH:mm'
+        dateFormat: 'HH:mm',
+        brand: '',
+        brandConfigured: false
     };
     var choices = {
         accent: ['steel', 'emerald', 'violet', 'amber', 'crimson'],
@@ -58,6 +60,11 @@
             });
         return result;
     }
+    function brand(value) {
+        if (typeof value !== 'string') return '';
+        value = value.replace(/^\s+|\s+$/g, '');
+        return value && value.length <= 40 ? value : '';
+    }
     function cleanPrefs(value) {
         var result = {};
         if (!record(value)) return result;
@@ -69,6 +76,12 @@
             } else if (key === 'pinned' || key === 'hidden') {
                 if (Array.isArray(item))
                     result[key] = ids(item, key === 'pinned' ? 30 : 60);
+            } else if (key === 'brand') {
+                if (item === '') result[key] = '';
+                else {
+                    var cleanedBrand = brand(item);
+                    if (cleanedBrand) result[key] = cleanedBrand;
+                }
             } else if (typeof item === 'boolean') result[key] = item;
         });
         return result;
@@ -161,6 +174,7 @@
         has: has,
         validId: validId,
         ids: ids,
+        brand: brand,
         cleanPrefs: cleanPrefs,
         preferences: preferences,
         input: input,

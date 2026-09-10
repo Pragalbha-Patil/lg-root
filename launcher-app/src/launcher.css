@@ -345,6 +345,72 @@ h1 b {
   text-align: center;
   color: #9fb0c6;
 }
+.brand-panel {
+  width: min(720px, 90vw);
+}
+.brand-help {
+  margin: 0 0 22px;
+  color: #b8c2d0;
+  font-size: 20px;
+  line-height: 1.5;
+}
+.brand-help b,
+.brand-preview b {
+  color: #eef3f9;
+}
+.brand-preview {
+  margin-bottom: 22px;
+  padding: 18px 20px;
+  border: 1px solid #2b3341;
+  border-radius: 14px;
+  background: #0c0f14;
+  color: #dce3ec;
+  font-size: 26px;
+  letter-spacing: 2px;
+}
+.brand-preview b {
+  letter-spacing: 1px;
+}
+.brand-panel label {
+  display: block;
+  margin-bottom: 8px;
+  color: #9fb0c6;
+  font-size: 17px;
+}
+#brandInput {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 15px 18px;
+  border: 2px solid #343d4e;
+  border-radius: 14px;
+  outline: none;
+  background: #171a21;
+  color: #eef3f9;
+  font: inherit;
+  font-size: 24px;
+}
+#brandInput:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+.brand-input-hint,
+.brand-error {
+  min-height: 22px;
+  margin: 8px 2px 0;
+  color: #77869a;
+  font-size: 15px;
+}
+.brand-error {
+  color: #ff9aa6;
+}
+.brand-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+}
+.brand-actions .srow {
+  flex: 1;
+}
 .srow {
   display: flex;
   align-items: center;

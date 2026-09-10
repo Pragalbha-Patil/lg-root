@@ -76,6 +76,8 @@ foreground return, and leaves unchanged clock markup intact.
 The service directory stores `usage.json`, `prefs.json`, and `.noredirect`.
 Usage is a relative launch sequence, renumbered and capped at 60 entries, used
 for **recency**, not launch frequency. Pinned/hidden preferences are bounded.
+The saved header brand is bounded to 40 characters; a separate completion marker
+prevents the default-brand first-run dialog from returning after updates.
 JSON state writes use a temporary file and rename; failed writes preserve the
 previous file. Preference updates are serialized in the frontend so rapid edits
 cannot arrive at the service out of order.
