@@ -76,11 +76,12 @@ take effect.
 Releases contain both an installable IPK and a source archive with the complete
 installer. On your computer, extract `minimal-home-vVERSION.tar.gz` into an empty
 directory. If a checksum file was downloaded alongside either artifact, verify it
-before extraction:
+before extraction. The verification and extraction are chained so a mismatch
+stops the recipe; do not continue after a failed verification:
 
 ```sh
-sha256sum -c minimal-home-vVERSION.tar.gz.sha256
-tar -xzf minimal-home-vVERSION.tar.gz
+sha256sum -c minimal-home-vVERSION.tar.gz.sha256 &&
+    tar -xzf minimal-home-vVERSION.tar.gz
 ```
 
 In the extracted directory, replace `mytv` with your SSH alias and run the bundled
