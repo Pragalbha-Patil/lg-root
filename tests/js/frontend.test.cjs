@@ -547,6 +547,21 @@ test('bundled preferences requested before an edit cannot overwrite it after sav
     assert.equal(app.document.body.classList.contains('no-labels'), true);
 });
 
+test('rapid sort and accent edits keep the sort refresh after both saves', t => {
+    const app = appFor(t);
+    const alpha = { id: 'alpha', title: 'Alpha', icon: 'icons/alpha.png' };
+    ready(app, { tiles: [video, alpha] });
+    assert.deepEqual(ids(app, 'grid'), ['video', 'alpha']);
+    const before = app.calls.filter(c => c.method === 'getTiles').length;
+    app.click('#settingsBtn');
+    app.click('[data-key="sort"]');
+    app.click('[data-key="accent"]');
+    save(app); save(app);
+    assert.equal(app.calls.filter(c => c.method === 'getTiles').length, before + 1);
+    app.tiles({ tiles: [video, alpha], inputs: [port] });
+    assert.deepEqual(ids(app, 'grid'), ['alpha', 'video']);
+});
+
 test('bundled preferences requested during a save cannot overwrite the saved value', t => {
     for (const finishFirst of [false, true]) {
         const app = appFor(t); ready(app);
