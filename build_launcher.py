@@ -234,6 +234,19 @@ def build(version=None, usage_path=None, preview=False):
     return out, (len(apps), len(inputs), len(sysrow)), usage
 
 
+def read_current(rel):
+    try:
+        with open(os.path.join(BASE, rel), encoding="utf-8") as f:
+            return f.read()
+    except OSError:
+        return None
+
+
+def write_output(rel, content):
+    with open(os.path.join(BASE, rel), "w", encoding="utf-8", newline="\n") as f:
+        f.write(content)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Build Minimal Home launcher")
     ap.add_argument("--check", action="store_true",
@@ -248,19 +261,10 @@ def main(argv=None):
     except (OSError, ValueError) as exc:
         ap.exit(1, "error: %s\n" % exc)
 
-    diffs = []
-    for rel, content in out.items():
-        path = os.path.join(BASE, rel)
-        try:
-            with open(path, encoding="utf-8") as f:
-                current = f.read()
-        except OSError:
-            current = None
-        if current != content:
-            diffs.append(rel)
-            if not args.check:
-                with open(path, "w", encoding="utf-8", newline="\n") as f:
-                    f.write(content)
+    diffs = [rel for rel, content in out.items() if read_current(rel) != content]
+    if not args.check:
+        for rel in diffs:
+            write_output(rel, out[rel])
 
     print("preview apps=%d inputs=%d sys=%d" % (na, ni, ns))
     if usage:

@@ -1013,137 +1013,142 @@
     document.getElementById("searchRows").innerHTML = html;
     focusFirst("#searchRows .srow");
   }
-  function activateRow(el) {
-    var mode = overlay.mode;
-    if (!el) return;
+  function activateBrandRow(el) {
     var key = el.getAttribute("data-key");
-    var id = el.getAttribute("data-id");
-    if (mode === "brand") {
-      if (key === "brand-save") closeBrandEditor(true);
-      else if (key === "brand-cancel") closeBrandEditor(false);
+    if (key === "brand-save") closeBrandEditor(true);
+    else if (key === "brand-cancel") closeBrandEditor(false);
+  }
+  function activateSettingsRow(el) {
+    var key = el.getAttribute("data-key");
+    if (key === "brand") {
+      openBrandEditor(false);
       return;
     }
-    if (mode === "settings") {
-      if (key === "brand") {
-        openBrandEditor(false);
-        return;
-      }
-      if (key === "tvsettings") {
-        hideOverlay();
-        if (SETTINGS_TILE) launch(SETTINGS_TILE.id, null);
-        return;
-      }
-      if (key === "close") {
-        hideOverlay();
-        return;
-      }
-      if (key === "manage") {
-        openManage();
-        return;
-      }
-      if (key === "reset") {
-        resetAll();
-        return;
-      }
-      if (key && findRow(key)) changeSetting(key, 1);
-      return;
-    }
-    if (mode === "manage") {
-      if (key === "close") {
-        hideOverlay();
-        return;
-      }
-      if (id) {
-        var i = PREFS.hidden.indexOf(id);
-        if (i >= 0) PREFS.hidden.splice(i, 1);
-        commitPrefs(function () {
-          hideOverlay();
-          refresh();
-        });
-      }
-      return;
-    }
-    if (mode === "options") {
-      var old = lastFocusEl;
-      var label = el.querySelector(".sl")
-        ? el.querySelector(".sl").textContent
-        : "";
-      if (label === "Close") {
-        hideOverlay();
-        return;
-      }
+    if (key === "tvsettings") {
       hideOverlay();
-      if (id) {
-        if (label === "Pin" || label === "Unpin") togglePin(id);
-        else if (label === "Hide app") hideApp(id);
-        else if (old) doLaunch(old);
-      }
+      if (SETTINGS_TILE) launch(SETTINGS_TILE.id, null);
       return;
     }
-    if (mode === "search") {
-      if (id) launchSearchRow(id);
+    if (key === "close") {
+      hideOverlay();
       return;
     }
+    if (key === "manage") {
+      openManage();
+      return;
+    }
+    if (key === "reset") {
+      resetAll();
+      return;
+    }
+    if (key && findRow(key)) changeSetting(key, 1);
+  }
+  function activateManageRow(el) {
+    if (el.getAttribute("data-key") === "close") {
+      hideOverlay();
+      return;
+    }
+    var id = el.getAttribute("data-id");
+    if (!id) return;
+    var i = PREFS.hidden.indexOf(id);
+    if (i >= 0) PREFS.hidden.splice(i, 1);
+    commitPrefs(function () {
+      hideOverlay();
+      refresh();
+    });
+  }
+  function activateOptionsRow(el) {
+    var label = el.querySelector(".sl")
+      ? el.querySelector(".sl").textContent
+      : "";
+    if (label === "Close") {
+      hideOverlay();
+      return;
+    }
+    hideOverlay();
+    var id = el.getAttribute("data-id");
+    if (!id) return;
+    if (label === "Pin" || label === "Unpin") togglePin(id);
+    else if (label === "Hide app") hideApp(id);
+    else if (lastFocusEl) doLaunch(lastFocusEl);
+  }
+  function activateSearchRow(el) {
+    var id = el.getAttribute("data-id");
+    if (id) launchSearchRow(id);
+  }
+  var ROW_ACTIVATORS = {
+    brand: activateBrandRow,
+    settings: activateSettingsRow,
+    manage: activateManageRow,
+    options: activateOptionsRow,
+    search: activateSearchRow
+  };
+  function activateRow(el) {
+    if (!el) return;
+    var activate = ROW_ACTIVATORS[overlay.mode];
+    if (activate) activate(el);
+  }
+  function brandBackKey() {
+    // The brand name is typed with the TV on-screen keyboard: Back and
+    // Backspace must reach the field (or dismiss the keyboard), never
+    // close the dialog and discard the typed name. The Save/Cancel rows
+    // dismiss the editor explicitly; elsewhere Back is swallowed so the
+    // webview never prompts to exit.
+    if (document.activeElement === document.getElementById("brandInput"))
+      return false;
+    return true;
+  }
+  function overlayBackKey(kc) {
+    if (kc === 8 && overlay.mode === "search" && searchQ) {
+      searchQ = searchQ.slice(0, -1);
+      renderSearch();
+      return true;
+    }
+    if (overlay.mode === "brand") return brandBackKey();
+    hideOverlay();
+    return true;
+  }
+  function brandDirKey(dir) {
+    if (
+      document.activeElement === document.getElementById("brandInput") &&
+      (dir === "left" || dir === "right")
+    )
+      return false;
+    moveFocusIn("#brandInput, #brandPanel .brand-actions .srow", dir);
+    return true;
+  }
+  function settingsDirKey(dir) {
+    if (dir !== "left" && dir !== "right") {
+      moveFocusIn("#settingsRows .srow", dir);
+      return true;
+    }
+    var row = document.activeElement;
+    if (
+      !row ||
+      !row.className ||
+      row.className.indexOf("srow") < 0 ||
+      !row.getAttribute("data-key")
+    )
+      return true;
+    changeSetting(row.getAttribute("data-key"), dir === "left" ? -1 : 1);
+    return true;
+  }
+  function overlayDirKey(dir) {
+    if (overlay.mode === "brand") return brandDirKey(dir);
+    if (overlay.mode === "settings") return settingsDirKey(dir);
+    var selectors = {
+      options: "#optionsRows .optrow",
+      manage: "#optionsRows .optrow, #optionsRows .srow",
+      search: "#searchRows .srow"
+    };
+    moveFocusIn(selectors[overlay.mode], dir);
+    return true;
   }
   function overlayKey(e) {
     var kc = e.keyCode;
-    if (BACK_KEYS[kc]) {
-      if (kc === 8 && overlay.mode === "search" && searchQ) {
-        searchQ = searchQ.slice(0, -1);
-        renderSearch();
-        return true;
-      }
-      if (overlay.mode === "brand") {
-        // The brand name is typed with the TV on-screen keyboard: Back and
-        // Backspace must reach the field (or dismiss the keyboard), never
-        // close the dialog and discard the typed name. The Save/Cancel rows
-        // dismiss the editor explicitly; elsewhere Back is swallowed so the
-        // webview never prompts to exit.
-        if (document.activeElement === document.getElementById("brandInput"))
-          return false;
-        return true;
-      }
-      hideOverlay();
-      return true;
-    }
+    if (BACK_KEYS[kc]) return overlayBackKey(kc);
     var dir = dirOf(kc);
-    if (dir) {
-      if (overlay.mode === "brand") {
-        if (
-          document.activeElement === document.getElementById("brandInput") &&
-          (dir === "left" || dir === "right")
-        )
-          return false;
-        moveFocusIn("#brandInput, #brandPanel .brand-actions .srow", dir);
-        return true;
-      }
-      if (overlay.mode === "settings") {
-        if (dir === "left" || dir === "right") {
-          var row = document.activeElement;
-          if (
-            row &&
-            row.className &&
-            row.className.indexOf("srow") >= 0 &&
-            row.getAttribute("data-key")
-          ) {
-            changeSetting(
-              row.getAttribute("data-key"),
-              dir === "left" ? -1 : 1
-            );
-          }
-        } else {
-          moveFocusIn("#settingsRows .srow", dir);
-        }
-        return true;
-      }
-      var selectors = {
-        options: "#optionsRows .optrow",
-        manage: "#optionsRows .optrow, #optionsRows .srow",
-        search: "#searchRows .srow"
-      };
-      moveFocusIn(selectors[overlay.mode], dir);
-      return true;
-    }
+    if (dir) return overlayDirKey(dir);
     if (kc === 13) {
       if (
         overlay.mode === "brand" &&
@@ -1210,30 +1215,31 @@
     });
     return rows;
   }
+  function findTileColumn(items, cEl) {
+    for (var ii = 0; ii < items.length; ii++) {
+      if (items[ii] === cEl) return ii;
+    }
+    return -1;
+  }
+  function findTileCell(rows, cEl) {
+    for (var ri = 0; ri < rows.length; ri++) {
+      var col = findTileColumn(rows[ri].items, cEl);
+      if (col >= 0) return { row: ri, col: col };
+    }
+    return null;
+  }
   function wrapTile(cur, dir) {
     var main = mainRowTiles();
     var cEl = navTiles()[cur];
     var rows = buildRows(main);
-    var ci = -1,
-      col = 0,
-      ri,
-      ii;
-    for (ri = 0; ri < rows.length; ri++) {
-      for (ii = 0; ii < rows[ri].items.length; ii++) {
-        if (rows[ri].items[ii] === cEl) {
-          ci = ri;
-          col = ii;
-          break;
-        }
-      }
-    }
-    if (ci < 0) return null;
+    var cell = findTileCell(rows, cEl);
+    if (!cell) return null;
     var ni =
       dir === "right" || dir === "down"
-        ? (ci + 1) % rows.length
-        : (ci - 1 + rows.length) % rows.length;
+        ? (cell.row + 1) % rows.length
+        : (cell.row - 1 + rows.length) % rows.length;
     var row = rows[ni];
-    return row ? row.items[col] || row.items[row.items.length - 1] : null;
+    return row ? row.items[cell.col] || row.items[row.items.length - 1] : null;
   }
   function navTiles() {
     return Array.prototype.slice.call(document.querySelectorAll(".tile"));
@@ -1353,14 +1359,13 @@
 
   document.addEventListener("keydown", function (e) {
     if (overlay.mode) {
-      if (e.keyCode === 13) {
-        // A held OK that opened this overlay must be released before activation.
-        if (enterPressed) {
-          e.preventDefault();
-          return;
-        }
-        enterPressed = true;
+      if (e.keyCode === 13 && enterPressed) {
+        // A held OK that opened this overlay must be released before
+        // activation; swallow it without activating any row.
+        e.preventDefault();
+        return;
       }
+      if (e.keyCode === 13) enterPressed = true;
       if (overlayKey(e)) e.preventDefault();
       return;
     }

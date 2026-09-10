@@ -9,6 +9,7 @@ export default [
         languageOptions: { ecmaVersion: 5, sourceType: 'script' },
         rules: {
             eqeqeq: ['error', 'always'],
+            'max-depth': ['error', 2],
             'no-unused-vars': ['error', { args: 'none', caughtErrors: 'none' }],
             'no-empty': ['error', { allowEmptyCatch: true }],
             'no-trailing-spaces': 'error',

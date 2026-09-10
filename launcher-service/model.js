@@ -65,6 +65,14 @@
         value = value.replace(/^\s+|\s+$/g, '');
         return value && value.length <= 40 ? value : '';
     }
+    function cleanBrandField(result, key, item) {
+        if (item === '') {
+            result[key] = '';
+            return;
+        }
+        var cleanedBrand = brand(item);
+        if (cleanedBrand) result[key] = cleanedBrand;
+    }
     function cleanPrefs(value) {
         var result = {};
         if (!record(value)) return result;
@@ -77,11 +85,7 @@
                 if (Array.isArray(item))
                     result[key] = ids(item, key === 'pinned' ? 30 : 60);
             } else if (key === 'brand') {
-                if (item === '') result[key] = '';
-                else {
-                    var cleanedBrand = brand(item);
-                    if (cleanedBrand) result[key] = cleanedBrand;
-                }
+                cleanBrandField(result, key, item);
             } else if (typeof item === 'boolean') result[key] = item;
         });
         return result;

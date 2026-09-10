@@ -1,6 +1,7 @@
 """Run the same offline checks locally and in CI; never connect to a TV."""
 
 import argparse
+import ast
 from html.parser import HTMLParser
 import json
 import os
@@ -58,35 +59,112 @@ class InlineScripts(HTMLParser):
             self.active = False
 
 
+def check_json(name, path, errors):
+    try:
+        json.loads(path.read_text(encoding="utf-8"))
+    except ValueError as exc:
+        errors.append("%s: %s" % (name, exc))
+
+
+def check_python(name, path, errors):
+    try:
+        compile(path.read_bytes(), name, "exec")
+    except SyntaxError as exc:
+        errors.append("%s: %s" % (name, exc))
+
+
+def check_shell(name, path, errors):
+    if b"\r" in path.read_bytes():
+        errors.append("%s: shell scripts must use LF line endings" % name)
+
+
+def check_link(name, path, target, errors):
+    target = target.strip().split(' "', 1)[0].strip("<>")
+    url = urlsplit(target)
+    if url.scheme or url.netloc or not url.path:
+        return
+    if not (path.parent / unquote(url.path)).exists():
+        errors.append("%s: missing link target %s" % (name, target))
+
+
+def check_markdown(name, path, errors):
+    # Check inline file links, not remote URLs or heading fragments.
+    body = re.sub(r"```.*?```", "", path.read_text(encoding="utf-8"), flags=re.S)
+    for target in re.findall(r"\[[^\]]*\]\(([^)]+)\)", body):
+        check_link(name, path, target, errors)
+
+
+def check_source(name, errors):
+    path = ROOT / name
+    if not path.is_file():
+        return
+    if path.suffix == ".json":
+        check_json(name, path, errors)
+    elif path.suffix == ".py":
+        check_python(name, path, errors)
+    elif path.suffix == ".sh":
+        check_shell(name, path, errors)
+    elif path.suffix == ".md":
+        check_markdown(name, path, errors)
+
+
 def check_sources(paths):
     errors = []
     for name in paths:
-        path = ROOT / name
-        if not path.is_file():
-            continue
-        if path.suffix == ".json":
-            try:
-                json.loads(path.read_text(encoding="utf-8"))
-            except ValueError as exc:
-                errors.append("%s: %s" % (name, exc))
-        if path.suffix == ".py":
-            try:
-                compile(path.read_bytes(), name, "exec")
-            except SyntaxError as exc:
-                errors.append("%s: %s" % (name, exc))
-        if path.suffix == ".sh" and b"\r" in path.read_bytes():
-            errors.append("%s: shell scripts must use LF line endings" % name)
-        if path.suffix == ".md":
-            # Check inline file links, not remote URLs or heading fragments.
-            body = re.sub(r"```.*?```", "", path.read_text(encoding="utf-8"), flags=re.S)
-            for target in re.findall(r"\[[^\]]*\]\(([^)]+)\)", body):
-                target = target.strip().split(' "', 1)[0].strip("<>")
-                url = urlsplit(target)
-                if not url.scheme and not url.netloc and url.path:
-                    if not (path.parent / unquote(url.path)).exists():
-                        errors.append("%s: missing link target %s" % (name, target))
+        check_source(name, errors)
     if errors:
         raise ValueError("\n".join(errors))
+
+
+NESTED_BLOCKS = (ast.If, ast.For, ast.While, ast.With, ast.Try)
+
+
+def _is_elif(node, parent):
+    return (isinstance(node, ast.If) and isinstance(parent, ast.If)
+            and len(parent.orelse) == 1 and parent.orelse[0] is node)
+
+
+def _walk_depth(node, parent, depth, violations, name):
+    for child in ast.iter_child_nodes(node):
+        nested = isinstance(child, NESTED_BLOCKS) and not _is_elif(child, node)
+        child_depth = depth + (1 if nested else 0)
+        if nested and child_depth > 2:
+            violations.append("%s:%d: blocks nested too deeply" % (name, child.lineno))
+        _walk_depth(child, node, child_depth, violations, name)
+
+
+def check_python_depth():
+    violations = []
+    shipped = [ROOT / "build_launcher.py"] + sorted((ROOT / "tools").glob("*.py"))
+    for path in shipped:
+        tree = ast.parse(path.read_bytes(), str(path))
+        _walk_depth(tree, None, 0, violations, path.name)
+    if violations:
+        raise ValueError("\n".join(violations))
+
+
+def check_js_syntax(node, paths):
+    for name in paths:
+        if name.endswith(".js") and (ROOT / name).is_file():
+            run([node, "--check", name])
+
+
+def check_shell_syntax(paths, shell):
+    for name in paths:
+        if name.endswith(".sh") and (ROOT / name).is_file():
+            run([shell, "-n", name])
+
+
+def check_inline_script(node, temp, index, source):
+    path = Path(temp) / ("inline-%d.js" % index)
+    path.write_text(source, encoding="utf-8")
+    run([node, "--check", str(path)])
+
+
+def check_inline_scripts(node, scripts):
+    with tempfile.TemporaryDirectory(prefix="minimal-home-check-") as temp:
+        for index, source in enumerate(scripts):
+            check_inline_script(node, temp, index, source)
 
 
 def main(argv=None):
@@ -114,26 +192,20 @@ def main(argv=None):
         if forbidden:
             raise ValueError("private/runtime files must not be tracked: " + ", ".join(forbidden))
         check_sources(paths)
+        check_python_depth()
         run([sys.executable, "build_launcher.py", "--check"])
         run([node, "node_modules/eslint/bin/eslint.js", "launcher-app/src", "launcher-service", "tests/js"])
         run([node, "node_modules/prettier/bin/prettier.cjs", "--check",
              "launcher-app/src/*.js", "launcher-app/src/*.css", "launcher-service/*.js"])
-        for name in paths:
-            if name.endswith(".js") and (ROOT / name).is_file():
-                run([node, "--check", name])
+        check_js_syntax(node, paths)
         scripts = InlineScripts()
         scripts.feed((ROOT / "launcher-app/index.html").read_text(encoding="utf-8"))
         if not scripts.scripts:
             raise ValueError("generated page has no inline JavaScript to check")
         with tempfile.TemporaryDirectory(prefix="minimal-home-check-") as temp:
-            for index, source in enumerate(scripts.scripts):
-                path = Path(temp) / ("inline-%d.js" % index)
-                path.write_text(source, encoding="utf-8")
-                run([node, "--check", str(path)])
+            check_inline_scripts(node, scripts.scripts)
         if shell:
-            for name in paths:
-                if name.endswith(".sh") and (ROOT / name).is_file():
-                    run([shell, "-n", name])
+            check_shell_syntax(paths, shell)
         else:
             print("SKIP: shell syntax and installer tests need POSIX sh (required in Linux CI)")
         run([sys.executable, "-m", "unittest", "discover", "-s", "tests", "-v"])
