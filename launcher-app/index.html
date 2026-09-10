@@ -352,6 +352,72 @@ h1 b {
   text-align: center;
   color: #9fb0c6;
 }
+.brand-panel {
+  width: min(720px, 90vw);
+}
+.brand-help {
+  margin: 0 0 22px;
+  color: #b8c2d0;
+  font-size: 20px;
+  line-height: 1.5;
+}
+.brand-help b,
+.brand-preview b {
+  color: #eef3f9;
+}
+.brand-preview {
+  margin-bottom: 22px;
+  padding: 18px 20px;
+  border: 1px solid #2b3341;
+  border-radius: 14px;
+  background: #0c0f14;
+  color: #dce3ec;
+  font-size: 26px;
+  letter-spacing: 2px;
+}
+.brand-preview b {
+  letter-spacing: 1px;
+}
+.brand-panel label {
+  display: block;
+  margin-bottom: 8px;
+  color: #9fb0c6;
+  font-size: 17px;
+}
+#brandInput {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 15px 18px;
+  border: 2px solid #343d4e;
+  border-radius: 14px;
+  outline: none;
+  background: #171a21;
+  color: #eef3f9;
+  font: inherit;
+  font-size: 24px;
+}
+#brandInput:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+.brand-input-hint,
+.brand-error {
+  min-height: 22px;
+  margin: 8px 2px 0;
+  color: #77869a;
+  font-size: 15px;
+}
+.brand-error {
+  color: #ff9aa6;
+}
+.brand-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+}
+.brand-actions .srow {
+  flex: 1;
+}
 .srow {
   display: flex;
   align-items: center;
@@ -525,6 +591,20 @@ h1 b {
   <div id="settingsRows" class="rowset"></div>
   <div class="settings-hint">&#8593; &#8595; Navigate &nbsp; &#183; &nbsp; &#8592; &#8594; Change &nbsp; &#183; &nbsp; OK Select &nbsp; &#183; &nbsp; BACK Close</div>
 </div>
+<div id="brandPanel" class="panel brand-panel" role="dialog" aria-modal="true" aria-labelledby="brandTitle">
+  <div class="panel-head" id="brandTitle">Choose your launcher name <small>Header brand</small></div>
+  <p class="brand-help">This name appears in bold after <b>WELCOME</b> in the upper-left header. Select the field with your TV remote to use the on-screen keyboard.</p>
+  <div class="brand-preview"><span>WELCOME</span> <b id="brandPreview">Minimal Home</b></div>
+  <label for="brandInput">Brand name</label>
+  <input id="brandInput" type="text" maxlength="40" autocomplete="off" aria-describedby="brandHelpText">
+  <div id="brandHelpText" class="brand-input-hint">Up to 40 characters. You can change it later in Settings.</div>
+  <div id="brandError" class="brand-error" role="alert"></div>
+  <div class="brand-actions">
+    <div class="srow" tabindex="0" data-key="brand-save"><span class="sl">Save name</span><span class="val">OK</span></div>
+    <div class="srow" tabindex="0" data-key="brand-cancel"><span class="sl" id="brandCancelLabel">Keep Minimal Home</span></div>
+  </div>
+  <div class="settings-hint">&#8593; &#8595; Navigate &nbsp; &#183; &nbsp; OK Select</div>
+</div>
 <div id="optionsPanel" class="panel opt">
   <div class="panel-head">Options</div>
   <div id="optionsRows" class="rowset"></div>
@@ -553,7 +633,9 @@ window.MH_CONFIG = {"version": "v1.5.0", "system": ["com.webos.app.discovery", "
         pinned: [],
         hidden: [],
         showSystemStats: true,
-        dateFormat: 'HH:mm'
+        dateFormat: 'HH:mm',
+        brand: '',
+        brandConfigured: false
     };
     var choices = {
         accent: ['steel', 'emerald', 'violet', 'amber', 'crimson'],
@@ -597,6 +679,11 @@ window.MH_CONFIG = {"version": "v1.5.0", "system": ["com.webos.app.discovery", "
             });
         return result;
     }
+    function brand(value) {
+        if (typeof value !== 'string') return '';
+        value = value.replace(/^\s+|\s+$/g, '');
+        return value && value.length <= 40 ? value : '';
+    }
     function cleanPrefs(value) {
         var result = {};
         if (!record(value)) return result;
@@ -608,6 +695,12 @@ window.MH_CONFIG = {"version": "v1.5.0", "system": ["com.webos.app.discovery", "
             } else if (key === 'pinned' || key === 'hidden') {
                 if (Array.isArray(item))
                     result[key] = ids(item, key === 'pinned' ? 30 : 60);
+            } else if (key === 'brand') {
+                if (item === '') result[key] = '';
+                else {
+                    var cleanedBrand = brand(item);
+                    if (cleanedBrand) result[key] = cleanedBrand;
+                }
             } else if (typeof item === 'boolean') result[key] = item;
         });
         return result;
@@ -700,6 +793,7 @@ window.MH_CONFIG = {"version": "v1.5.0", "system": ["com.webos.app.discovery", "
         has: has,
         validId: validId,
         ids: ids,
+        brand: brand,
         cleanPrefs: cleanPrefs,
         preferences: preferences,
         input: input,
@@ -851,6 +945,10 @@ window.MH_CONFIG = {"version": "v1.5.0", "system": ["com.webos.app.discovery", "
   var tilesLoaded = false;
   var renderedTiles = "";
   var PREFS = M.preferences();
+  var DEFAULT_BRAND = "Minimal Home";
+  var configuredHeader = { text: "Welcome", brand: DEFAULT_BRAND };
+  var headerLoaded = false;
+  var brandFirstRun = false;
   var clockTimer = null,
     clockHTML = "";
   var prefsRevision = 0;
@@ -1020,6 +1118,7 @@ window.MH_CONFIG = {"version": "v1.5.0", "system": ["com.webos.app.discovery", "
     var statsEl = document.getElementById("sysStats");
     if (statsEl)
       statsEl.style.display = PREFS.showSystemStats ? "flex" : "none";
+    applyBrand();
     tick();
   }
   function persistFocus() {
@@ -1224,6 +1323,15 @@ window.MH_CONFIG = {"version": "v1.5.0", "system": ["com.webos.app.discovery", "
   }
 
   var SETTING_ROWS = [
+    {
+      key: "brand",
+      group: "Header",
+      label: "Brand name",
+      type: "action",
+      fmt: function () {
+        return effectiveBrand();
+      }
+    },
     {
       key: "tvsettings",
       group: "TV",
@@ -1488,6 +1596,7 @@ window.MH_CONFIG = {"version": "v1.5.0", "system": ["com.webos.app.discovery", "
   function hideOverlay() {
     document.getElementById("dim").classList.remove("show");
     document.getElementById("settingsPanel").classList.remove("show");
+    document.getElementById("brandPanel").classList.remove("show");
     document.getElementById("optionsPanel").classList.remove("show");
     document.getElementById("searchBox").classList.remove("show");
     overlay.mode = null;
@@ -1511,6 +1620,75 @@ window.MH_CONFIG = {"version": "v1.5.0", "system": ["com.webos.app.discovery", "
     renderSettings();
     showOverlay("settingsPanel");
     focusFirst("#settingsRows .srow");
+  }
+  function effectiveBrand() {
+    return M.brand(PREFS.brand) || configuredHeader.brand || DEFAULT_BRAND;
+  }
+  function applyBrand() {
+    var name = effectiveBrand();
+    document.getElementById("headBrand").textContent = name;
+    document.title = name;
+  }
+  function updateBrandPreview() {
+    var value = M.brand(document.getElementById("brandInput").value);
+    document.getElementById("brandPreview").textContent =
+      value || effectiveBrand();
+  }
+  function openBrandEditor(firstRun) {
+    if (firstRun) lastFocusEl = document.activeElement;
+    else document.getElementById("settingsPanel").classList.remove("show");
+    brandFirstRun = !!firstRun;
+    document.getElementById("brandInput").value = effectiveBrand();
+    document.getElementById("brandError").textContent = "";
+    document.getElementById("brandCancelLabel").textContent = firstRun
+      ? "Keep " + DEFAULT_BRAND
+      : "Cancel";
+    updateBrandPreview();
+    overlay.mode = "brand";
+    showOverlay("brandPanel");
+    focusFirst("#brandInput");
+  }
+  function closeBrandEditor(save) {
+    var firstRun = brandFirstRun;
+    var changed = false;
+    if (save) {
+      var name = M.brand(document.getElementById("brandInput").value);
+      if (!name) {
+        document.getElementById("brandError").textContent =
+          "Enter a name from 1 to 40 characters.";
+        focusFirst("#brandInput");
+        return;
+      }
+      PREFS.brand = name;
+      PREFS.brandConfigured = true;
+      changed = true;
+    } else if (firstRun && !PREFS.brandConfigured) {
+      PREFS.brandConfigured = true;
+      changed = true;
+    }
+    brandFirstRun = false;
+    applyBrand();
+    document.getElementById("brandPanel").classList.remove("show");
+    if (firstRun) {
+      hideOverlay();
+    } else {
+      overlay.mode = "settings";
+      renderSettings();
+      document.getElementById("settingsPanel").classList.add("show");
+      focusRow("brand");
+    }
+    if (changed) commitPrefs();
+  }
+  function maybePromptBrand() {
+    if (
+      !headerLoaded ||
+      overlay.mode ||
+      PREFS.brandConfigured ||
+      M.brand(PREFS.brand) ||
+      configuredHeader.brand !== DEFAULT_BRAND
+    )
+      return;
+    openBrandEditor(true);
   }
   function openOptions(el) {
     lastFocusEl = el;
@@ -1647,7 +1825,16 @@ window.MH_CONFIG = {"version": "v1.5.0", "system": ["com.webos.app.discovery", "
     if (!el) return;
     var key = el.getAttribute("data-key");
     var id = el.getAttribute("data-id");
+    if (mode === "brand") {
+      if (key === "brand-save") closeBrandEditor(true);
+      else if (key === "brand-cancel") closeBrandEditor(false);
+      return;
+    }
     if (mode === "settings") {
+      if (key === "brand") {
+        openBrandEditor(false);
+        return;
+      }
       if (key === "tvsettings") {
         hideOverlay();
         if (SETTINGS_TILE) launch(SETTINGS_TILE.id, null);
@@ -1713,11 +1900,30 @@ window.MH_CONFIG = {"version": "v1.5.0", "system": ["com.webos.app.discovery", "
         renderSearch();
         return true;
       }
+      if (overlay.mode === "brand") {
+        // The brand name is typed with the TV on-screen keyboard: Back and
+        // Backspace must reach the field (or dismiss the keyboard), never
+        // close the dialog and discard the typed name. The Save/Cancel rows
+        // dismiss the editor explicitly; elsewhere Back is swallowed so the
+        // webview never prompts to exit.
+        if (document.activeElement === document.getElementById("brandInput"))
+          return false;
+        return true;
+      }
       hideOverlay();
       return true;
     }
     var dir = dirOf(kc);
     if (dir) {
+      if (overlay.mode === "brand") {
+        if (
+          document.activeElement === document.getElementById("brandInput") &&
+          (dir === "left" || dir === "right")
+        )
+          return false;
+        moveFocusIn("#brandInput, #brandPanel .brand-actions .srow", dir);
+        return true;
+      }
       if (overlay.mode === "settings") {
         if (dir === "left" || dir === "right") {
           var row = document.activeElement;
@@ -1746,6 +1952,11 @@ window.MH_CONFIG = {"version": "v1.5.0", "system": ["com.webos.app.discovery", "
       return true;
     }
     if (kc === 13) {
+      if (
+        overlay.mode === "brand" &&
+        document.activeElement === document.getElementById("brandInput")
+      )
+        return false;
       e.preventDefault();
       var el = document.activeElement;
       activateRow(el);
@@ -2010,6 +2221,10 @@ window.MH_CONFIG = {"version": "v1.5.0", "system": ["com.webos.app.discovery", "
   sb.addEventListener("click", function () {
     openSettingsPanel();
   });
+  document.getElementById("brandInput").addEventListener("input", function () {
+    document.getElementById("brandError").textContent = "";
+    updateBrandPreview();
+  });
   Array.prototype.forEach.call(
     document.querySelectorAll("#grid .tile, #inputs .tile, #sysrow .tile"),
     function (el) {
@@ -2046,16 +2261,16 @@ window.MH_CONFIG = {"version": "v1.5.0", "system": ["com.webos.app.discovery", "
     return document.hidden && !document.hasFocus();
   }
   function applyHeader(h) {
-    if (!h) return;
-    if (h.text) {
+    if (!M.record(h)) return;
+    if (typeof h.text === "string") {
+      configuredHeader.text = h.text;
       document.getElementById("headText").textContent = String(
         h.text
       ).toUpperCase();
     }
-    if (h.brand) {
-      document.getElementById("headBrand").textContent = String(h.brand);
-      document.title = String(h.brand);
-    }
+    if (typeof h.brand === "string") configuredHeader.brand = h.brand;
+    headerLoaded = true;
+    applyBrand();
   }
   function tilesFailed() {
     refreshing = false;
@@ -2117,6 +2332,7 @@ window.MH_CONFIG = {"version": "v1.5.0", "system": ["com.webos.app.discovery", "
           if (M.record(d.prefs)) acceptPrefs(d.prefs, revision);
           else if (!prefsSaving && revision === prefsRevision) loadPrefs();
           rebuild(d.tiles, d.inputs);
+          maybePromptBrand();
         } else {
           tilesFailed();
         }

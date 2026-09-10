@@ -131,10 +131,103 @@ test('settings cycle choices, toggles and accents; save errors are visible; acti
     app.click('[data-key="close"]'); assert.equal(app.document.querySelector('#settingsPanel').classList.contains('show'), false);
 });
 
+test('default brand opens a remote-friendly first-run editor and saves the header name', t => {
+    const app = appFor(t);
+    app.tiles({ tiles: [video], inputs: [port], prefs: {},
+        header: { text: 'Welcome', brand: 'Minimal Home' } });
+    const panel = app.document.querySelector('#brandPanel');
+    const input = app.document.querySelector('#brandInput');
+    assert.ok(panel.classList.contains('show'));
+    assert.equal(app.document.activeElement, input);
+    assert.equal(input.value, 'Minimal Home');
+    assert.match(panel.querySelector('.brand-help').textContent, /upper-left header/);
+    assert.equal(app.key(13).defaultPrevented, false, 'OK on the field remains available to the TV keyboard');
+    app.key(13, 'keyup');
+    input.value = '   '; app.click('[data-key="brand-save"]');
+    assert.match(app.document.querySelector('#brandError').textContent, /1 to 40/);
+    assert.ok(panel.classList.contains('show'));
+    input.value = 'Living Room'; input.dispatchEvent(new app.window.Event('input'));
+    assert.equal(app.document.querySelector('#brandPreview').textContent, 'Living Room');
+    app.key(40); app.key(40, 'keyup'); app.key(13); app.key(13, 'keyup');
+    const call = app.calls.find(c => c.method === 'setPrefs' && !c.answered);
+    assert.equal(call.parameters.brand, 'Living Room');
+    assert.equal(call.parameters.brandConfigured, true);
+    assert.equal(app.document.querySelector('#headBrand').textContent, 'Living Room');
+    assert.equal(app.document.title, 'Living Room');
+    save(app);
+});
+
+test('non-default configured brands skip setup and remain editable from Settings', t => {
+    const app = appFor(t);
+    app.tiles({ tiles: [video], inputs: [], prefs: {},
+        header: { text: 'Hello', brand: 'Family TV' } });
+    assert.equal(app.document.querySelector('#brandPanel.show'), null);
+    assert.equal(app.document.querySelector('#headBrand').textContent, 'Family TV');
+    app.click('#settingsBtn');
+    assert.equal(row(app, 'brand').querySelector('.val').textContent, 'Family TV');
+    app.click('[data-key="brand"]');
+    assert.ok(app.document.querySelector('#brandPanel.show'));
+    assert.equal(app.document.querySelector('#brandInput').value, 'Family TV');
+    app.click('[data-key="brand-cancel"]');
+    assert.ok(app.document.querySelector('#settingsPanel.show'));
+    assert.equal(app.calls.filter(c => c.method === 'setPrefs').length, 0);
+});
+
+test('keeping the default brand records setup so updates do not ask again', t => {
+    const app = appFor(t);
+    const response = { tiles: [video], inputs: [], prefs: {},
+        header: { text: 'Welcome', brand: 'Minimal Home' } };
+    app.tiles(response);
+    app.key(40); app.key(40, 'keyup'); app.key(40); app.key(40, 'keyup');
+    assert.equal(app.document.activeElement.getAttribute('data-key'), 'brand-cancel');
+    app.key(13); app.key(13, 'keyup');
+    const call = app.calls.find(c => c.method === 'setPrefs' && !c.answered);
+    assert.equal(call.parameters.brand, '');
+    assert.equal(call.parameters.brandConfigured, true);
+    save(app);
+    const updated = appFor(t);
+    updated.tiles({ ...response, prefs: { brandConfigured: true } });
+    assert.equal(updated.document.querySelector('#brandPanel.show'), null);
+});
+
+test('back never closes the brand name editor', t => {
+    const app = appFor(t);
+    app.tiles({ tiles: [video], inputs: [], prefs: {},
+        header: { text: 'Welcome', brand: 'Minimal Home' } });
+    const panel = app.document.querySelector('#brandPanel');
+    const input = app.document.querySelector('#brandInput');
+    input.value = 'My TV';
+    for (const code of [461, 27, 8]) {
+        assert.equal(app.key(code).defaultPrevented, false, 'back reaches the field while typing ' + code);
+        assert.ok(panel.classList.contains('show'), 'first-run editor stays open for back key ' + code);
+    }
+    assert.equal(input.value, 'My TV');
+    app.key(40); app.key(40, 'keyup');
+    assert.equal(app.document.activeElement.getAttribute('data-key'), 'brand-save');
+    for (const code of [461, 27, 8]) {
+        assert.equal(app.key(code).defaultPrevented, true, 'back off the field is swallowed ' + code);
+        assert.ok(panel.classList.contains('show'), 'first-run editor stays open off the field ' + code);
+    }
+    assert.equal(app.calls.filter(c => c.method === 'setPrefs').length, 0);
+
+    const settings = appFor(t);
+    settings.tiles({ tiles: [video], inputs: [], prefs: {},
+        header: { text: 'Hello', brand: 'Family TV' } });
+    settings.click('#settingsBtn');
+    settings.click('[data-key="brand"]');
+    assert.ok(settings.document.querySelector('#brandPanel.show'));
+    settings.key(40); settings.key(40, 'keyup');
+    assert.equal(settings.document.activeElement.getAttribute('data-key'), 'brand-save');
+    assert.equal(settings.key(461).defaultPrevented, true);
+    assert.ok(settings.document.querySelector('#brandPanel.show'), 'settings editor stays open');
+    assert.equal(settings.document.querySelector('#settingsPanel.show'), null);
+    assert.equal(settings.calls.filter(c => c.method === 'setPrefs').length, 0);
+});
+
 test('grouped settings keep remote navigation on controls across section headings', t => {
     const app = appFor(t); ready(app); app.click('#settingsBtn');
     assert.deepEqual([...app.document.querySelectorAll('#settingsRows h2')].map(el => el.textContent),
-        ['TV', 'Clock & status', 'Appearance', 'Apps', 'Preferences']);
+        ['Header', 'TV', 'Clock & status', 'Appearance', 'Apps', 'Preferences']);
     const controls = [...app.document.querySelectorAll('#settingsRows .srow')];
     assert.equal(app.document.activeElement, controls[0]);
     for (let i = 1; i <= controls.length; i++) {

@@ -18,6 +18,7 @@ inputs, and a clock on a dark background, with navigation designed for a TV remo
 - Foreground-event redirects from LG Home, with a ten-minute bypass via the LG Home tile.
 - Optional CPU, memory, and temperature readings, where the TV exposes them.
 - A loading indicator while the TV discovers apps, inputs, and system tiles.
+- A remote-friendly first-run prompt for naming the launcher header.
 
 ## Get started
 
@@ -31,7 +32,22 @@ registration and requested Luna permissions. This project does not root your TV.
 Device notes cover webOS 10.3.1; there is no verified compatibility matrix across
 TV models or firmware.
 
-### Install on a rooted TV
+### Install the release IPK (easiest)
+
+Download `org.minimal.home_VERSION_all.ipk` from the latest release, then install
+it with webOS Dev Manager or the official webOS CLI:
+
+```sh
+ares-install --device mytv org.minimal.home_VERSION_all.ipk
+```
+
+The IPK contains both the launcher app and its Node service. This is the quickest
+way to install them, but a direct IPK installation cannot add the root watcher or
+apply Homebrew's legacy service elevation. If your TV needs Home-button redirection,
+system statistics, or additional Luna permissions, use the complete installer
+below.
+
+### Complete rooted-TV installation
 
 This path needs Python, Git, a POSIX shell, and SSH/SCP on your computer. It builds
 a standard webOS `.ipk`, installs the app and service through webOS, adds the
@@ -61,17 +77,6 @@ checkout. This is a static grid preview, not a simulated Luna service: live sear
 pinning, saving, stats and recovery require a TV or the isolated test harness.
 Restore the normal
 build with `python build_launcher.py` before committing or packaging.
-
-### Install a release IPK manually
-
-Release downloads include an `.ipk` containing both the app and its Node service.
-It can be installed with webOS Dev Manager or `ares-install`, but those methods do
-not install or start the root watcher. Use `tools/install.sh` from the source or
-release archive for the complete launcher setup.
-
-```sh
-ares-install --device mytv org.minimal.home_VERSION_all.ipk
-```
 
 ### Contribute or run checks
 
