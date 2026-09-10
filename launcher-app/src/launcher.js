@@ -138,6 +138,7 @@
   var tilesLoaded = false;
   var renderedTiles = "";
   var PREFS = M.preferences();
+  var lastSavedPrefs = M.preferences();
   var DEFAULT_BRAND = "Minimal Home";
   var configuredHeader = { text: "Welcome", brand: DEFAULT_BRAND };
   var headerLoaded = false;
@@ -645,6 +646,17 @@
       completion();
     });
   }
+  function diffPrefs(current, base) {
+    // Edits send only keys that differ from the last saved snapshot, so an
+    // edit made before initial discovery completes cannot overwrite saved
+    // customization with startup defaults. The relay merges per key.
+    var diff = {};
+    Object.keys(current).forEach(function (key) {
+      if (JSON.stringify(current[key]) !== JSON.stringify(base[key]))
+        diff[key] = current[key];
+    });
+    return diff;
+  }
   function savePrefs() {
     prefsSaving = true;
     var revision = prefsRevision;
@@ -658,13 +670,21 @@
         showError(
           "Could not save settings: " + (error.errorText || "unknown error")
         );
-      else PREFS = M.preferences(response.prefs);
+      else {
+        PREFS = M.preferences(response.prefs);
+        lastSavedPrefs = M.preferences(response.prefs);
+      }
       runCompletions();
+    }
+    var payload = diffPrefs(PREFS, lastSavedPrefs);
+    if (Object.keys(payload).length === 0) {
+      finish({ prefs: PREFS }, null);
+      return;
     }
     svcCall(
       SVC,
       SVC_PREFS_SET_M,
-      M.preferences(PREFS),
+      payload,
       function (response) {
         finish(response, null);
       },
@@ -779,6 +799,7 @@
     var update = M.cleanPrefs(prefs);
     Object.keys(update).forEach(function (key) {
       PREFS[key] = update[key];
+      lastSavedPrefs[key] = update[key];
     });
     applyPrefs();
   }
