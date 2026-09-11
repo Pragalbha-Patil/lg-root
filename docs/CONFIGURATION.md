@@ -85,7 +85,9 @@ options, date format, sort mode, and system statistics. A brand saved through th
 launcher takes precedence over `header.brand` and can be edited again from the
 Brand name row. Use the per-tile menu to pin/unpin or hide an app; pinned apps
 can be reordered from the same menu with Move (unavailable under Alphabetical
-sorting, which ignores pin ordering). Restore hidden apps from Settings. App labels affects tile captions only, not
+sorting, which ignores pin ordering). Restore hidden apps from Settings. The
+Status row reports the running build, tile and stats health, and relay
+reachability, with manual refresh and LG Home actions. App labels affects tile captions only, not
 CPU/RAM/temperature captions; tiles retain accessible names when captions are hidden.
 Reset all restores defaults.
 
