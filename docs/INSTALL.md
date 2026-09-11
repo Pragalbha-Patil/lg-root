@@ -45,9 +45,11 @@ installed configuration and runtime state, builds and uploads an IPK, installs
 it, replaces only the Minimal Home watcher and relay processes, and requests a
 fresh launch.
 SSH/SCP failures and unsuccessful Luna launch replies produce a nonzero exit.
-The service directory receives sticky shared-write permissions so the jailed relay
-can atomically maintain preferences and its temporary Home-bypass marker without
-being able to remove files owned by other accounts.
+The service directory receives shared-write permissions (like Homebrew's own
+service directory) so the jailed relay can atomically maintain preferences and
+its temporary Home-bypass marker even though package installs leave runtime
+state root-owned while the relay runs under a dynamic service user. If relay
+writes ever fail with permission errors, rerunning the installer repairs them.
 The installer uses the public Luna client for IPK installation. On rooted builds
 whose SSH sessions omit Luna preload variables, it reuses the running Minimal Home
 watcher's environment for final launch.

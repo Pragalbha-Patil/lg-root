@@ -306,7 +306,8 @@ class InstallerTest(unittest.TestCase):
         self.assertIn("xargs -0 env", command)
         self.assertIn("/proc/$watcher/environ", command)
         calls = self.log.read_text()
-        self.assertIn("chmod 1777", calls)
+        self.assertIn("chmod 0777", calls)
+        self.assertIn("-w 300000", calls)
         self.assertIn("appInstallService/dev/install", calls)
         self.assertIn("elevate-service' org.minimal.home.service", calls)
         self.assertIn("applicationManager/close", calls)
@@ -318,7 +319,7 @@ class InstallerTest(unittest.TestCase):
         self.assertIn("|| cmp -s", calls)
         self.assertLess(calls.find("cp -p"), calls.find("appInstallService/dev/install"))
         self.assertGreater(calls.rfind("cp -p"), calls.find("appInstallService/dev/install"))
-        self.assertLess(calls.find("chmod 1777"), calls.rfind("cp -p"))
+        self.assertLess(calls.find("chmod 0777"), calls.rfind("cp -p"))
         self.assertLess(calls.rfind("\nscp\n"), calls.find("appInstallService/dev/install"))
         self.assertLess(calls.find("applicationManager/close"), calls.find("appInstallService/dev/install"))
         self.assertLess(calls.find("elevate-service' org.minimal.home.service"),

@@ -123,8 +123,9 @@ These constraints come from project device observations, including webOS
   SSH sessions lack Luna preload variables, so final launch reuses the running
   Minimal Home watcher's bounded environment when available.
 - The jailed relay must create runtime state beside its service files. The
-  installer gives that directory sticky shared-write permissions, preserving
-  per-file ownership while allowing atomic preference and bypass writes.
+  installer gives that directory shared-write permissions (package installs
+  leave state root-owned while the relay runs under a dynamic service user),
+  preserving atomic preference and bypass writes.
 - Changed files do not necessarily replace already-running webview, relay, or
   watcher processes. See [installation](INSTALL.md) for verification.
 

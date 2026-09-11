@@ -112,8 +112,9 @@ ssh "$REMOTE" "luna-send-pub -n 1 luna://com.webos.applicationManager/close '{\"
 echo "Installing Minimal Home app and service"
 # The install API streams progress. awk exits successfully only after the
 # terminal installed state, and fails on an explicit rejection or timeout.
+# Slow TVs need several minutes from verification to installation.
 # shellcheck disable=SC2029
-INSTALL_RESPONSE=$(ssh "$REMOTE" "luna-send-pub -w 90000 -i 'luna://com.webos.appInstallService/dev/install' '{\"id\":\"com.ares.defaultName\",\"ipkUrl\":\"$REMOTE_IPK\",\"subscribe\":true}' | awk '/\"state\"[[:space:]]*:[[:space:]]*\"installed\"/{print; ok=1; exit} /\"returnValue\"[[:space:]]*:[[:space:]]*false|\"state\"[[:space:]]*:[[:space:]]*\"[^\"]*failed[^\"]*\"/{print; exit 1} END {if (!ok) exit 1}'")
+INSTALL_RESPONSE=$(ssh "$REMOTE" "luna-send-pub -w 300000 -i 'luna://com.webos.appInstallService/dev/install' '{\"id\":\"com.ares.defaultName\",\"ipkUrl\":\"$REMOTE_IPK\",\"subscribe\":true}' | awk '/\"state\"[[:space:]]*:[[:space:]]*\"installed\"/{print; ok=1; exit} /\"returnValue\"[[:space:]]*:[[:space:]]*false|\"state\"[[:space:]]*:[[:space:]]*\"[^\"]*failed[^\"]*\"/{print; exit 1} END {if (!ok) exit 1}'")
 printf '%s\n' "$INSTALL_RESPONSE"
 
 echo "Applying Homebrew Luna permissions to the relay"
@@ -131,8 +132,12 @@ ssh "$REMOTE" "relay=\$(ps -eo pid,args | awk '\$2 == \"org.minimal.home.service
 echo "Installing and starting the watcher boot hook"
 # Stop only the old Minimal Home watcher so updated code is loaded, then install
 # the packaged idempotent hook and run it once for the current boot.
+# The service directory stays world-writable (like Homebrew's own service):
+# package installs leave runtime state root-owned while the relay runs under a
+# dynamic service user, so only a permission without sticky semantics keeps the
+# relay's atomic preference writes working after every install.
 # shellcheck disable=SC2029
-ssh "$REMOTE" "chmod 1777 '$SVC_DIR'; for name in usage.json prefs.json .noredirect; do source='$REMOTE_STATE/service/'\"\$name\"; target='$SVC_DIR/'\"\$name\"; if test -f \"\$source\"; then cp -p \"\$source\" \"\$target\" || cmp -s \"\$source\" \"\$target\"; fi; done; if test -d '$REMOTE_STATE/app/icons'; then mkdir -p '$APP_DIR/icons'; cp -Rp '$REMOTE_STATE/app/icons/.' '$APP_DIR/icons/'; fi; rm -rf '$REMOTE_STATE'; rm -f '$REMOTE_IPK'; mkdir -p /var/lib/webosbrew/init.d; cp '$SVC_DIR/start-watcher.sh' /var/lib/webosbrew/init.d/50-minimal-home; chmod 755 /var/lib/webosbrew/init.d/50-minimal-home; watcher=\$(ps -eo pid,args | awk '\$2 == \"node\" && \$3 == \"$SVC_DIR/watcher.js\" {print \$1; exit}'); if test -n \"\$watcher\"; then kill \"\$watcher\"; fi; /var/lib/webosbrew/init.d/50-minimal-home; count=0; while test \"\$count\" -lt 20 && ! test -s '$APP_DIR/icons/com.palm.app.settings.png'; do sleep 1; count=\$((count + 1)); done"
+ssh "$REMOTE" "chmod 0777 '$SVC_DIR'; for name in usage.json prefs.json .noredirect; do source='$REMOTE_STATE/service/'\"\$name\"; target='$SVC_DIR/'\"\$name\"; if test -f \"\$source\"; then cp -p \"\$source\" \"\$target\" || cmp -s \"\$source\" \"\$target\"; fi; done; if test -d '$REMOTE_STATE/app/icons'; then mkdir -p '$APP_DIR/icons'; cp -Rp '$REMOTE_STATE/app/icons/.' '$APP_DIR/icons/'; fi; rm -rf '$REMOTE_STATE'; rm -f '$REMOTE_IPK'; mkdir -p /var/lib/webosbrew/init.d; cp '$SVC_DIR/start-watcher.sh' /var/lib/webosbrew/init.d/50-minimal-home; chmod 755 /var/lib/webosbrew/init.d/50-minimal-home; watcher=\$(ps -eo pid,args | awk '\$2 == \"node\" && \$3 == \"$SVC_DIR/watcher.js\" {print \$1; exit}'); if test -n \"\$watcher\"; then kill \"\$watcher\"; fi; /var/lib/webosbrew/init.d/50-minimal-home; count=0; while test \"\$count\" -lt 20 && ! test -s '$APP_DIR/icons/com.palm.app.settings.png'; do sleep 1; count=\$((count + 1)); done"
 
 echo "Requesting launch of Minimal Home"
 # Root SSH lacks Luna preload variables on some TVs. Reuse the environment of
