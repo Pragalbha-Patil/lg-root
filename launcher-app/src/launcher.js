@@ -28,6 +28,7 @@
           /* Expiry still releases the request. */
         }
       }
+      noteLuna(false, method + ": timed out");
       done(onErr, { errorText: "Service request timed out" });
     }, 15000);
     function done(callback, value) {
@@ -38,9 +39,13 @@
       if (typeof callback === "function") callback(value);
     }
     function success(value) {
-      if (!value || value.returnValue !== true)
+      if (!value || value.returnValue !== true) {
+        noteLuna(false, method + ": bad response");
         done(onErr, value || { errorText: "Invalid service response" });
-      else done(onOk, value);
+      } else {
+        noteLuna(true, method);
+        done(onOk, value);
+      }
     }
     try {
       if (navigator.service && navigator.service.request) {
@@ -50,6 +55,7 @@
           subscribe: false,
           onSuccess: success,
           onFailure: function (error) {
+            noteLuna(false, method + ": refused");
             done(onErr, error);
           }
         });
@@ -66,6 +72,7 @@
         try {
           value = JSON.parse(message);
         } catch (e) {
+          noteLuna(false, method + ": bad response");
           done(onErr, { errorText: "Invalid service response" });
           return;
         }
@@ -73,8 +80,24 @@
       };
       bridge.call(uri + "/" + method, JSON.stringify(params || {}));
     } catch (e) {
+      noteLuna(false, method + ": failed to start");
       done(onErr, { errorText: String(e) });
     }
+  }
+  var health = {
+    tilesAt: 0,
+    tilesOk: false,
+    statsAt: 0,
+    statsOk: false,
+    lunaAt: 0,
+    lunaOk: false,
+    lunaDetail: "no requests yet"
+  };
+  window.__mhHealth = health;
+  function noteLuna(ok, detail) {
+    health.lunaOk = ok;
+    health.lunaAt = Date.now();
+    health.lunaDetail = detail;
   }
   var launchBusy = false,
     launchTimer = null,
@@ -502,18 +525,21 @@
     }
     if (!id) return;
     if (id === "__LGHOME__") {
-      svcCall(
-        SVC,
-        SVC_LGHOME_M,
-        {},
-        function () {},
-        function (error) {
-          showError((error && error.errorText) || "Could not open LG Home");
-        }
-      );
+      launchLGHome();
       return;
     }
     launch(id, tileParams(el));
+  }
+  function launchLGHome() {
+    svcCall(
+      SVC,
+      SVC_LGHOME_M,
+      {},
+      function () {},
+      function (error) {
+        showError((error && error.errorText) || "Could not open LG Home");
+      }
+    );
   }
   function launchFromId(id) {
     var t = null;
@@ -612,8 +638,16 @@
       }
     },
     {
-      key: "reset",
+      key: "status",
       group: "Preferences",
+      label: "Status",
+      type: "action",
+      fmt: function () {
+        return window.__MHBUILD || "";
+      }
+    },
+    {
+      key: "reset",
       label: "Reset preferences",
       type: "action",
       fmt: function () {
@@ -835,6 +869,7 @@
     document.getElementById("brandPanel").classList.remove("show");
     document.getElementById("confirmPanel").classList.remove("show");
     document.getElementById("moveHint").style.display = "none";
+    document.getElementById("statusPanel").classList.remove("show");
     moveState = null;
     document.getElementById("optionsPanel").classList.remove("show");
     document.getElementById("searchBox").classList.remove("show");
@@ -942,6 +977,102 @@
     )
       return;
     openBrandEditor(true);
+  }
+  function statusTime(ts) {
+    return formatDate(new Date(ts), "HH:mm:ss");
+  }
+  function statusTilesRow() {
+    if (!health.tilesAt) return "waiting";
+    return (
+      (health.tilesOk ? "ok · " : "failed · ") + statusTime(health.tilesAt)
+    );
+  }
+  function statusStatsRow() {
+    if (!PREFS.showSystemStats) return "disabled";
+    if (!health.statsAt) return "unavailable";
+    if (!health.statsOk) return "failed · " + statusTime(health.statsAt);
+    if (Date.now() - health.statsAt > 20000)
+      return "stale · " + statusTime(health.statsAt);
+    return "fresh · " + statusTime(health.statsAt);
+  }
+  function statusRelayRow() {
+    if (!health.lunaAt) return "no requests yet";
+    return (
+      (health.lunaOk ? "reachable · " : "unreachable · ") +
+      statusTime(health.lunaAt)
+    );
+  }
+  function statusRow(label, value) {
+    return (
+      '<div class="srow" tabindex="0" data-key="none"><span class="sl">' +
+      esc(label) +
+      '</span><span class="val">' +
+      esc(value) +
+      "</span></div>"
+    );
+  }
+  function statusActionRow(key, label, hint) {
+    return (
+      '<div class="srow" tabindex="0" data-key="' +
+      key +
+      '"><span class="sl">' +
+      esc(label) +
+      '</span><span class="val">' +
+      esc(hint) +
+      "</span></div>"
+    );
+  }
+  function statusNote(text) {
+    return (
+      '<div class="srow" tabindex="0" data-key="none"><span class="small">' +
+      esc(text) +
+      "</span></div>"
+    );
+  }
+  function renderStatus() {
+    var focused =
+      document.activeElement && document.activeElement.getAttribute
+        ? document.activeElement.getAttribute("data-key")
+        : null;
+    document.getElementById("statusRows").innerHTML = [
+      statusRow("Build", window.__MHBUILD || "unknown"),
+      statusRow("Tiles", statusTilesRow()),
+      statusRow("System stats", statusStatsRow()),
+      statusRow("Relay", statusRelayRow()),
+      statusActionRow("status-refresh", "Refresh now", "OK"),
+      statusActionRow("status-lghome", "Open LG Home", "10-min bypass"),
+      statusNote(
+        "No tiles? Refresh now, then Retry on the home grid. Stats need the watcher hook; see INSTALL."
+      ),
+      statusActionRow("status-close", "Back to Settings", "OK")
+    ].join("");
+    var restore =
+      (focused &&
+        document.querySelector('#statusRows [data-key="' + focused + '"]')) ||
+      document.querySelector("#statusRows .srow");
+    try {
+      if (restore) restore.focus();
+    } catch (e) {}
+  }
+  function openStatus() {
+    document.getElementById("settingsPanel").classList.remove("show");
+    overlay.mode = "status";
+    renderStatus();
+    showOverlay("statusPanel");
+    focusFirst("#statusRows .srow");
+  }
+  function closeStatus() {
+    document.getElementById("statusPanel").classList.remove("show");
+    overlay.mode = "settings";
+    renderSettings();
+    document.getElementById("settingsPanel").classList.add("show");
+    focusRow("status");
+  }
+  function activateStatusRow(el) {
+    var key = el.getAttribute("data-key");
+    if (key === "status-refresh") refresh();
+    else if (key === "status-lghome") launchLGHome();
+    else if (key === "status-close") closeStatus();
   }
   function openOptions(el) {
     lastFocusEl = el;
@@ -1180,6 +1311,10 @@
       openManage();
       return;
     }
+    if (key === "status") {
+      openStatus();
+      return;
+    }
     if (key === "reset") {
       openConfirmReset();
       return;
@@ -1234,7 +1369,8 @@
     manage: activateManageRow,
     options: activateOptionsRow,
     search: activateSearchRow,
-    confirm: activateConfirmRow
+    confirm: activateConfirmRow,
+    status: activateStatusRow
   };
   function activateRow(el) {
     if (!el) return;
@@ -1280,6 +1416,10 @@
       closeMove(false);
       return true;
     }
+    if (overlay.mode === "status") {
+      closeStatus();
+      return true;
+    }
     hideOverlay();
     return true;
   }
@@ -1323,6 +1463,10 @@
     if (overlay.mode === "search") return searchDirKey(dir);
     if (overlay.mode === "confirm") {
       moveFocusIn("#confirmPanel .srow", dir);
+      return true;
+    }
+    if (overlay.mode === "status") {
+      moveFocusIn("#statusRows .srow", dir);
       return true;
     }
     if (overlay.mode === "move") return moveDirKey(dir);
@@ -1680,8 +1824,14 @@
     headerLoaded = true;
     applyBrand();
   }
+  function noteTiles(ok) {
+    health.tilesOk = ok;
+    health.tilesAt = Date.now();
+    if (overlay.mode === "status") renderStatus();
+  }
   function tilesFailed() {
     refreshing = false;
+    noteTiles(false);
     if (refreshRequested) {
       refreshRequested = false;
       refresh();
@@ -1752,6 +1902,7 @@
           else if (!prefsSaving && revision === prefsRevision) loadPrefs();
           rebuild(d.tiles, d.inputs);
           maybePromptBrand();
+          noteTiles(true);
         } else {
           tilesFailed();
         }
@@ -1807,6 +1958,11 @@
   });
   // System stats polling (every 5s)
   var statsPending = false;
+  function noteStats(ok) {
+    health.statsOk = ok;
+    health.statsAt = Date.now();
+    if (overlay.mode === "status") renderStatus();
+  }
   function updateSystemStats() {
     if (!isBackground() && PREFS.showSystemStats && !statsPending) {
       statsPending = true;
@@ -1816,6 +1972,7 @@
         {},
         function (d) {
           statsPending = false;
+          noteStats(!!(d && d.returnValue));
           if (d && d.returnValue) {
             var cpu = document.getElementById("statCpu");
             var ram = document.getElementById("statRam");
@@ -1833,6 +1990,7 @@
         },
         function () {
           statsPending = false;
+          noteStats(false);
         }
       );
     }

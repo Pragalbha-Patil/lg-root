@@ -303,6 +303,68 @@ test('reset failure stays visible with settings open', t => {
     assert.ok(app.document.querySelector('#settingsPanel.show'));
 });
 
+test('status shows build, tile and relay health and refreshes on demand', async t => {
+    const app = appFor(t); ready(app);
+    await app.clock.run(1000); app.respond('getSystemStats', { returnValue: true, cpu: 0, ram: 60, temp: 65 });
+    app.click('#settingsBtn');
+    assert.equal(row(app, 'status').querySelector('.val').textContent, app.window.MH_CONFIG.version);
+    app.click('[data-key="status"]');
+    const panel = app.document.querySelector('#statusPanel');
+    assert.ok(panel.classList.contains('show'));
+    assert.match(panel.textContent, /Tiles/);
+    assert.match(panel.textContent, /ok/);
+    assert.match(panel.textContent, /fresh/);
+    assert.match(panel.textContent, /reachable/);
+    const before = app.calls.filter(c => c.method === 'getTiles').length;
+    app.click('[data-key="status-refresh"]');
+    assert.equal(app.calls.filter(c => c.method === 'getTiles').length, before + 1);
+    app.tiles({ tiles: [video], inputs: [port] });
+    assert.ok(panel.classList.contains('show'), 'panel survives its own refresh');
+    app.key(40); app.key(40, 'keyup');
+    assert.ok(panel.classList.contains('show'));
+    app.click('[data-key="status-close"]');
+    assert.ok(app.document.querySelector('#settingsPanel.show'));
+    assert.equal(app.document.activeElement.getAttribute('data-key'), 'status');
+    assert.equal(app.calls.filter(c => c.method === 'setPrefs').length, 0);
+});
+
+test('status reports failed tiles, disabled and stale stats', async t => {
+    const app = appFor(t);
+    app.respond('getTiles', { returnValue: false });
+    app.click('#settingsBtn');
+    app.click('[data-key="status"]');
+    assert.match(app.document.querySelector('#statusPanel').textContent, /failed/);
+    assert.match(app.document.querySelector('#statusPanel').textContent, /unreachable/);
+    const quiet = appFor(t);
+    ready(quiet, { prefs: { showSystemStats: false } });
+    quiet.click('#settingsBtn'); quiet.click('[data-key="status"]');
+    assert.match(quiet.document.querySelector('#statusPanel').textContent, /disabled/);
+    const stale = appFor(t); ready(stale);
+    await stale.clock.run(1000);
+    stale.respond('getSystemStats', { returnValue: true, cpu: 0, ram: 60, temp: 65 });
+    stale.window.__mhHealth.statsAt -= 60000;
+    stale.click('#settingsBtn'); stale.click('[data-key="status"]');
+    assert.match(stale.document.querySelector('#statusPanel').textContent, /stale/);
+});
+
+test('status marks stats failed on older relay responses', async t => {
+    const app = appFor(t); ready(app);
+    await app.clock.run(1000); app.respond('getSystemStats', {});
+    app.click('#settingsBtn'); app.click('[data-key="status"]');
+    assert.match(app.document.querySelector('#statusPanel').textContent, /failed/);
+});
+
+test('status opens LG Home through the relay', t => {
+    const app = appFor(t); ready(app);
+    app.click('#settingsBtn'); app.click('[data-key="status"]');
+    app.click('[data-key="status-lghome"]');
+    assert.ok(app.calls.find(c => c.method === 'openLGHome'));
+    assert.ok(app.document.querySelector('#statusPanel.show'), 'panel stays open');
+    app.key(461);
+    assert.ok(app.document.querySelector('#settingsPanel.show'));
+    assert.equal(app.document.activeElement.getAttribute('data-key'), 'status');
+});
+
 test('grouped settings keep remote navigation on controls across section headings', t => {
     const app = appFor(t); ready(app); app.click('#settingsBtn');
     assert.deepEqual([...app.document.querySelectorAll('#settingsRows h2')].map(el => el.textContent),
