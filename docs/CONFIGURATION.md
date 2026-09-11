@@ -92,7 +92,8 @@ CPU/RAM/temperature captions; tiles retain accessible names when captions are hi
 Reset all restores defaults.
 
 Preferences live in `prefs.json` next to the service on the TV, not in the build
-config. The installer preserves these files. Recently used sorts by launch recency,
+config. The installer preserves these files. See the [Luna reference](LUNA.md)
+for keys, defaults, limits, and partial-update rules. Recently used sorts by launch recency,
 with pinned apps first and configured priority as a fallback. Pinned first ignores
 recency and uses configured priority/title after pins. Alphabetical ignores pin
 ordering. Pin badges remain visible in every mode.

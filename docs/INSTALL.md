@@ -142,6 +142,8 @@ every five minutes. The installer briefly waits for that first pass before launc
 Service logs are at `/tmp/minhome-svc.log`; watcher logs are at
 `/tmp/minhome-watch.log`. They disappear on reboot. Redact identifying information
 before sharing logs. A browser-only preview cannot validate these platform behaviors.
+The [Luna reference](LUNA.md) documents every relay method, the persisted
+preferences, and live diagnostic queries.
 
 ## Return to stock Home
 
