@@ -38,7 +38,7 @@ build with `python build_launcher.py` before committing or packaging.
 | Component | Responsibilities |
 | --- | --- |
 | Frontend | Rendering, focus, search, menus, refresh, and Luna requests |
-| `service.js` | `getTiles`, `launchApp`, `openLGHome`, `getPrefs`, `setPrefs`, `getSystemStats` |
+| `service.js` | `getTiles`, `launchApp`, `openLGHome`, `getPrefs`, `setPrefs`, `getSystemStats` (see the [Luna reference](LUNA.md)) |
 | `watcher.js` | Foreground subscription/reconnects, redirect retries, icon copies, stats sampling |
 | `constants.js` | App/service IDs, install locations, state and log paths |
 | `model.js` | Pure validation, preferences, input classification, launch parameters, and sorting; shared with the frontend |
