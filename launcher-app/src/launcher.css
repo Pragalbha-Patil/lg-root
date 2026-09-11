@@ -121,6 +121,11 @@ h1 b {
 }
 #settingsBtn .gear,
 #searchBtn .gear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
   font-size: 22px;
 }
 #searchBtn .gear svg {
@@ -371,6 +376,13 @@ h1 b {
   line-height: 1.5;
   text-align: center;
   color: #9fb0c6;
+}
+.made-by {
+  margin-top: 10px;
+  font-size: 13px;
+  letter-spacing: 3px;
+  text-align: center;
+  color: #5f6b7d;
 }
 .brand-panel {
   width: min(720px, 90vw);
