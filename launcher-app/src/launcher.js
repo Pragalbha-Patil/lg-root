@@ -462,7 +462,8 @@
     list.sys.forEach(function (t) {
       sysrow.appendChild(tileEl(t));
     });
-    if (!overlay.mode) restoreFocus();
+    if (overlay.mode === "move") markMovedTile();
+    else if (!overlay.mode) restoreFocus();
   }
   function tileEl(t) {
     var d = document.createElement("div");

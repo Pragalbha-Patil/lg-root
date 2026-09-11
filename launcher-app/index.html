@@ -1350,7 +1350,8 @@ window.MH_CONFIG = {"version": "v1.6.0", "system": ["com.webos.app.discovery", "
     list.sys.forEach(function (t) {
       sysrow.appendChild(tileEl(t));
     });
-    if (!overlay.mode) restoreFocus();
+    if (overlay.mode === "move") markMovedTile();
+    else if (!overlay.mode) restoreFocus();
   }
   function tileEl(t) {
     var d = document.createElement("div");
