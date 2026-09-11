@@ -315,6 +315,7 @@ test('status shows build, tile and relay health and refreshes on demand', async 
     assert.match(panel.textContent, /ok/);
     assert.match(panel.textContent, /fresh/);
     assert.match(panel.textContent, /reachable/);
+    assert.match(panel.textContent, /Made by Pragalbha Patil/);
     const before = app.calls.filter(c => c.method === 'getTiles').length;
     app.click('[data-key="status-refresh"]');
     assert.equal(app.calls.filter(c => c.method === 'getTiles').length, before + 1);
