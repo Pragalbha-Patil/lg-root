@@ -30,20 +30,33 @@ broaden all app permissions.
 
 ## Upload from a source checkout
 
-Build on your computer with Python 3.10+. Use a POSIX shell with SSH/SCP installed;
-on Windows use Git Bash or WSL. Configure an SSH host alias such as `mytv`.
+Build on your computer with Python 3.10+. On Windows run these from the
+repository root in Git Bash, WSL, or Command Prompt (`tools\install.cmd`
+finds a POSIX shell for you); elsewhere use any POSIX shell with SSH/SCP
+installed. One command does everything — pass your TV's SSH alias, hostname,
+or IPv4 address (use an alias for IPv6) directly:
 
 ```sh
-TV_HOST=mytv sh tools/install.sh --check
-TV_HOST=mytv sh tools/install.sh
+sh tools/install.sh mytv
 ```
 
-The prerequisite check is read-only. It verifies root SSH, the Luna install client,
-Node.js, `setsid`, and Homebrew's service-elevation helper. A normal run builds,
-checks generated-file freshness, stages the runtime allowlist, preserves the
+On Windows Command Prompt instead:
+
+```bat
+tools\install.cmd mytv
+```
+
+`TV_HOST=mytv` also works in place of the argument, and an interactive shell
+asks for the address when neither is given. A normal run first repeats the
+read-only prerequisite check below, then builds, checks generated-file
+freshness, stages the runtime allowlist, preserves the
 installed configuration and runtime state, builds and uploads an IPK, installs
 it, replaces only the Minimal Home watcher and relay processes, and requests a
-fresh launch.
+fresh launch. To verify prerequisites without changing anything:
+
+```sh
+sh tools/install.sh mytv --check
+```
 SSH/SCP failures and unsuccessful Luna launch replies produce a nonzero exit.
 The service directory receives shared-write permissions (like Homebrew's own
 service directory) so the jailed relay can atomically maintain preferences and
@@ -56,10 +69,10 @@ watcher's environment for final launch.
 
 | Variable/option | Purpose |
 | --- | --- |
-| `TV_HOST` | Required SSH alias, hostname, or IPv4 address; use an alias for IPv6 |
+| `TV_HOST` | SSH alias, hostname, or IPv4 address; use an alias for IPv6. Set as `TV_HOST=mytv` or pass as the first argument (`sh tools/install.sh mytv`, which wins) |
 | `TV_USER` | SSH user, default `root` |
 | `PYTHON` | Python executable, default `python`; set `python3` if needed |
-| `--check` | Check remote first-install prerequisites without modifying them |
+| `--check` | Check remote first-install prerequisites without modifying them (a normal run checks automatically) |
 | `--no-build` | Skip generation; still require up-to-date generated files |
 
 App and service IDs are fixed in manifests and code. Environment overrides to
@@ -91,7 +104,7 @@ installer. It provides the same automatic configuration preservation as a source
 checkout:
 
 ```sh
-TV_HOST=mytv sh tools/install.sh
+sh tools/install.sh mytv
 ```
 
 The archive contains only allowlisted files, not personal runtime state. Its

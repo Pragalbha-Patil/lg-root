@@ -294,6 +294,33 @@ class InstallerTest(unittest.TestCase):
         self.assertNotIn("scp", calls)
         self.assertNotIn("mkdir", calls)
 
+    def test_positional_host_is_accepted_and_overrides_env(self):
+        self.env.pop("TV_HOST")
+        result = self.install("example-tv", "--check")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("example-tv", result.stdout)
+        self.env["TV_HOST"] = "other-tv"
+        result = self.install("example-tv", "--check")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("example-tv", result.stdout)
+
+    def test_second_positional_host_is_rejected(self):
+        result = self.install("one-tv", "two-tv", "--check")
+        self.assertNotEqual(result.returncode, 0)
+
+    def test_missing_host_fails_fast_without_prompt(self):
+        self.env.pop("TV_HOST")
+        result = self.install("--no-build")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("TV_HOST", result.stderr)
+        self.assertFalse(self.log.exists())
+
+    def test_deploy_runs_preflight_check_before_upload(self):
+        result = self.install("--no-build")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        calls = self.log.read_text()
+        self.assertLess(calls.find("test -x"), calls.find("\nscp\n"))
+
     def test_upload_sends_valid_launch_json(self):
         result = self.install("--no-build")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -364,7 +391,9 @@ class InstallerTest(unittest.TestCase):
         self.env["MH_SCP_EXIT"] = "1"
         result = self.install("--no-build")
         self.assertNotEqual(result.returncode, 0)
-        self.assertNotIn("luna-send", self.log.read_text())
+        calls = self.log.read_text()
+        self.assertNotIn("appInstallService/dev/install", calls)
+        self.assertNotIn("applicationManager/launch", calls)
 
     def test_remote_and_luna_failures_propagate(self):
         self.env["MH_SSH_EXIT"] = "255"

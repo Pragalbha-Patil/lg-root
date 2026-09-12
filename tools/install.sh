@@ -9,23 +9,44 @@ fail() {
 
 DO_BUILD=1
 MODE=deploy
+TV_HOST=${TV_HOST:-}
+HOST_FROM_ARG=
 for arg in "$@"; do
     case "$arg" in
         --check) MODE=check ;;
         --no-build) DO_BUILD=0 ;;
         --help|-h)
-            echo "usage: sh tools/install.sh [--check] [--no-build]"
+            echo "usage: sh tools/install.sh [TV_HOST] [--check] [--no-build]"
+            echo "   or: TV_HOST=mytv sh tools/install.sh [--check] [--no-build]"
             echo "env: TV_HOST (SSH alias or hostname), TV_USER (default root), PYTHON (default python)"
-            echo "Builds and installs the app/service IPK, preserves config, installs the watcher hook, and launches."
+            echo "A host argument overrides TV_HOST. Without a host, an interactive"
+            echo "shell is asked for one. A normal run checks prerequisites first,"
+            echo "then builds and installs the app/service IPK, preserves config,"
+            echo "installs the watcher hook, and launches."
             exit 0
             ;;
-        *) fail "unknown option: $arg" ;;
+        -*) fail "unknown option: $arg" ;;
+        *)
+            if [ -n "$HOST_FROM_ARG" ]; then
+                fail "unexpected extra argument: $arg"
+            fi
+            TV_HOST=$arg
+            HOST_FROM_ARG=1
+            ;;
     esac
 done
 
 TV_USER=${TV_USER:-root}
 TV_HOST=${TV_HOST:-}
 PYTHON=${PYTHON:-python}
+if [ -z "$TV_HOST" ]; then
+    if [ -t 0 ]; then
+        printf 'TV address (SSH alias, hostname, or IPv4 address): '
+        read -r TV_HOST || fail "no TV address given"
+    else
+        fail "set TV_HOST to an SSH alias, hostname, or IPv4 address, or pass it: sh tools/install.sh mytv"
+    fi
+fi
 case "$TV_HOST" in
     ''|-*|*[!a-zA-Z0-9._-]*) fail "set TV_HOST to an SSH alias, hostname, or IPv4 address (use an alias for IPv6)" ;;
 esac
@@ -48,6 +69,12 @@ if [ "$MODE" = check ]; then
     echo "Root SSH, Luna installer access, Node.js, and Homebrew service elevation are available."
     exit 0
 fi
+# A normal run repeats the read-only prerequisite check before changing
+# anything, so a separate --check invocation is optional.
+echo "Checking install prerequisites on $TV_HOST"
+# shellcheck disable=SC2029
+ssh "$REMOTE" "test \"\$(id -u)\" = 0 && command -v luna-send-pub >/dev/null && command -v node >/dev/null && command -v setsid >/dev/null && test -x '$ELEVATE'" \
+    || fail "prerequisite check failed on $TV_HOST (need root SSH, Luna installer access, Node.js, and Homebrew service elevation)"
 command -v scp >/dev/null 2>&1 || fail "scp is required"
 command -v "$PYTHON" >/dev/null 2>&1 || fail "Python is required; set PYTHON to its executable"
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
