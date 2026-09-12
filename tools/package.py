@@ -39,6 +39,7 @@ RUNTIME_FILES = (
 RELEASE_FILES = RUNTIME_FILES + (
     "LICENSE",
     "docs/INSTALL.md",
+    "tools/install.cmd",
     "tools/install.sh",
     "tools/make_ipk.py",
     "tools/merge_config.py",
